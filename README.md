@@ -47,7 +47,7 @@ Communication uses HID Interface 2 with 65-byte feature reports. Protocol is bas
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later)
+- [Node.js](https://nodejs.org/) (v22 or later)
 - macOS or Windows
 
 ### Install & Run
