@@ -78,15 +78,32 @@ jobs:
       - name: Create release
         run: |
           mapfile -d '' FILES < <(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \) -print0)
+
+          cat > notes.md << 'NOTES'
+          ## Downloads
+
+          | Platform | File | Type |
+          |----------|------|------|
+          NOTES
+
+          for f in "${FILES[@]}"; do
+            name=$(basename "$f")
+            if [[ "$name" == *.dmg ]]; then
+              echo "| **macOS** (Apple Silicon) | \`$name\` | Disk Image |" >> notes.md
+            elif [[ "$name" == *.zip ]]; then
+              echo "| **macOS** (Apple Silicon) | \`$name\` | ZIP Archive |" >> notes.md
+            elif [[ "$name" == *.exe ]]; then
+              echo "| **Windows** | \`$name\` | Installer |" >> notes.md
+            fi
+          done
+
+          echo "" >> notes.md
+          echo "---" >> notes.md
+          echo "Built from [\`${GITHUB_SHA::7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" >> notes.md
+
           gh release create latest \
             --title "MeRGB v${{ steps.version.outputs.version }}" \
-            --notes "Automated build from latest commit on main.
-
-          **Downloads:**
-          - **macOS (Apple Silicon):** MeRGB DMG or ZIP
-          - **Windows:** MeRGB Setup EXE
-
-          Commit: ${{ github.sha }}" \
+            --notes-file notes.md \
             "${FILES[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
