@@ -6,12 +6,16 @@ An open-source macOS and Windows app for controlling RGB lighting on the **Mount
 
 ## Download
 
-Grab the latest release from the [Releases](../../releases) page:
+[![Build & Release](https://github.com/MSaaim/mergb/actions/workflows/release.yml/badge.svg)](https://github.com/MSaaim/mergb/actions/workflows/release.yml)
 
-| Platform | File |
+Grab the latest build from the [Releases page](https://github.com/MSaaim/mergb/releases/latest):
+
+| Platform | Download |
 |---|---|
-| macOS (Apple Silicon) | `MeRGB-1.0.0-arm64.dmg` |
-| Windows | `MeRGB Setup 1.0.0.exe` |
+| macOS (Apple Silicon) | [Latest DMG / ZIP](https://github.com/MSaaim/mergb/releases/latest) |
+| Windows | [Latest Setup EXE](https://github.com/MSaaim/mergb/releases/latest) |
+
+A new release is built automatically on every push to `main`.
 
 On macOS, you may need to grant Input Monitoring permission (System Settings > Privacy & Security > Input Monitoring). On Windows, run as Administrator if the keyboard is not detected.
 
