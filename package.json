@@ -15,6 +15,7 @@
   "build": {
     "appId": "com.ivectoracademy.mergb",
     "productName": "MeRGB",
+    "publisherName": "MeRGB",
     "files": [
       "main.js",
       "preload.js",
@@ -45,7 +46,7 @@
           ]
         }
       ],
-      "identity": null
+      "identity": "MeRGB"
     },
     "win": {
       "target": ["nsis"],

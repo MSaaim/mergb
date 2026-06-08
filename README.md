@@ -17,7 +17,27 @@ Grab the latest build from the [Releases page](https://github.com/MSaaim/mergb/r
 
 A new release is built automatically on every push to `main`.
 
-On macOS, you may need to grant Input Monitoring permission (System Settings > Privacy & Security > Input Monitoring). On Windows, run as Administrator if the keyboard is not detected.
+### macOS Installation
+
+The app is not code-signed (no Apple Developer certificate), so macOS Gatekeeper will block it. To install:
+
+1. Open the DMG and drag MeRGB to Applications
+2. **Don't double-click to open.** Instead, right-click (or Control-click) MeRGB and select **Open**
+3. Click **Open** in the dialog that appears
+4. If you see "app is damaged", open Terminal and run:
+   ```bash
+   xattr -cr /Applications/MeRGB.app
+   ```
+   Then right-click > Open again.
+5. Grant **Input Monitoring** permission when prompted (System Settings > Privacy & Security > Input Monitoring)
+
+### Windows Installation
+
+Run the installer. Windows SmartScreen may show an "Unknown publisher" warning since the app is not code-signed:
+
+1. Click **More info** on the SmartScreen popup
+2. Click **Run anyway**
+3. If the keyboard is not detected, run MeRGB as Administrator
 
 ## Features
 
