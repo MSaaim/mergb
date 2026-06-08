@@ -77,6 +77,7 @@ jobs:
 
       - name: Create release
         run: |
+          mapfile -d '' FILES < <(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \) -print0)
           gh release create latest \
             --title "MeRGB v${{ steps.version.outputs.version }}" \
             --notes "Automated build from latest commit on main.
@@ -86,6 +87,6 @@ jobs:
           - **Windows:** MeRGB Setup EXE
 
           Commit: ${{ github.sha }}" \
-            $(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \))
+            "${FILES[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
