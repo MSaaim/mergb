@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MeRGB</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <!-- ── Title bar ─────────────────────────────────────────────────────────── -->
+  <div class="titlebar">
+    <div class="titlebar-brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 19h20L12 2z"/>
+        <path d="M8 19v-6h8v6"/>
+      </svg>
+      MeRGB
+    </div>
+    <div id="conn-badge" class="badge badge-disconnected">Disconnected</div>
+  </div>
+
+  <!-- ── App shell ──────────────────────────────────────────────────────────── -->
+  <div class="app">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <button class="nav-btn active" data-tab="lighting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        Lighting
+      </button>
+      <!-- <button class="nav-btn" data-tab="profiles">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        Profiles
+      </button> -->
+      <button class="nav-btn" data-tab="minecraft">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+          <path d="M9 4v16M15 4v16M4 9h16M4 15h16"/>
+        </svg>
+        Minecraft
+      </button>
+      <button class="nav-btn" data-tab="visualizer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="14" width="3" height="7" rx="1"/><rect x="8" y="9" width="3" height="12" rx="1"/>
+          <rect x="13" y="4" width="3" height="17" rx="1"/><rect x="18" y="11" width="3" height="10" rx="1"/>
+        </svg>
+        Visualizer
+      </button>
+      <button class="nav-btn" data-tab="device">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/>
+        </svg>
+        Device
+      </button>
+
+      <div class="sidebar-spacer"></div>
+
+      <button id="btn-connect" class="nav-btn connect-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+        Connect
+      </button>
+    </nav>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- ── LIGHTING TAB ──────────────────────────────────────────────────── -->
+      <section id="tab-lighting" class="tab active">
+        <div class="tab-header">
+          <h2>Lighting Effects</h2>
+          <p class="subtitle">Choose an effect and customise its colours, speed and brightness.</p>
+        </div>
+
+        <!-- Current lighting indicator -->
+        <div id="current-lighting" class="current-lighting">
+          <span class="current-lighting-label">Current</span>
+          <span class="current-lighting-swatch" id="current-swatch"></span>
+          <span class="current-lighting-effect" id="current-effect-name">Not set</span>
+        </div>
+
+        <!-- Effect grid -->
+        <div class="effect-grid">
+          <button class="effect-card active" data-effect="static">
+            <div class="effect-icon" style="background:conic-gradient(#ff4d6d,#ff4d6d)"></div>
+            <span>Static</span>
+          </button>
+          <button class="effect-card" data-effect="wave">
+            <div class="effect-icon wave-preview"></div>
+            <span>Wave</span>
+          </button>
+          <button class="effect-card" data-effect="breathing">
+            <div class="effect-icon breathing-preview"></div>
+            <span>Breathing</span>
+          </button>
+          <button class="effect-card" data-effect="reactive">
+            <div class="effect-icon reactive-preview"></div>
+            <span>Reactive</span>
+          </button>
+          <button class="effect-card" data-effect="tornado">
+            <div class="effect-icon tornado-preview"></div>
+            <span>Tornado</span>
+          </button>
+          <button class="effect-card" data-effect="matrix">
+            <div class="effect-icon matrix-preview"></div>
+            <span>Matrix</span>
+          </button>
+          <button class="effect-card" data-effect="yeti">
+            <div class="effect-icon yeti-preview"></div>
+            <span>Yeti</span>
+          </button>
+          <button class="effect-card" data-effect="custom">
+            <div class="effect-icon custom-preview"></div>
+            <span>Custom</span>
+          </button>
+          <button class="effect-card" data-effect="off">
+            <div class="effect-icon" style="background:#111;border:1px solid #333"></div>
+            <span>Off</span>
+          </button>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-grid">
+
+          <!-- Colors -->
+          <div class="control-group" id="group-color1">
+            <label class="control-label">Primary Colour</label>
+            <div class="color-row">
+              <input type="color" id="color1" value="#ff4d6d" class="color-swatch" />
+              <input type="text"  id="color1-hex" value="#ff4d6d" class="hex-input" maxlength="7" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="control-group hidden" id="group-color2">
+            <label class="control-label">Secondary Colour</label>
+            <div class="color-row">
+              <input type="color" id="color2" value="#0080ff" class="color-swatch" />
+              <input type="text"  id="color2-hex" value="#0080ff" class="hex-input" maxlength="7" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="control-group hidden" id="group-colormode">
+            <label class="control-label">Colour Mode</label>
+            <div class="segment-group" id="colormode-seg">
+              <button class="seg-btn active" data-val="rainbow">Rainbow</button>
+              <button class="seg-btn" data-val="single">Single</button>
+              <button class="seg-btn" data-val="dual">Dual</button>
+            </div>
+          </div>
+
+          <div class="control-group hidden" id="group-direction">
+            <label class="control-label">Direction</label>
+            <div class="segment-group" id="dir-seg">
+              <button class="seg-btn active" data-val="right">Right</button>
+              <button class="seg-btn" data-val="left">Left</button>
+              <button class="seg-btn" data-val="up">Up</button>
+              <button class="seg-btn" data-val="down">Down</button>
+            </div>
+            <div class="segment-group" id="dir-seg-rot" style="margin-top:6px">
+              <button class="seg-btn" data-val="clockwise">CW</button>
+              <button class="seg-btn" data-val="anticlockwise">CCW</button>
+            </div>
+          </div>
+
+          <!-- Speed -->
+          <div class="control-group hidden" id="group-speed">
+            <label class="control-label">Speed <span id="lbl-speed" class="val-label">128</span></label>
+            <input type="range" id="slider-speed" class="slider" min="10" max="255" value="128" />
+          </div>
+
+          <!-- Brightness -->
+          <div class="control-group" id="group-brightness">
+            <label class="control-label">Brightness <span id="lbl-brightness" class="val-label">255</span></label>
+            <input type="range" id="slider-brightness" class="slider" min="0" max="255" value="255" />
+          </div>
+
+        </div>
+
+        <div id="effect-action-row" class="action-row">
+          <div id="lighting-status" class="status-msg"></div>
+          <button id="btn-apply" class="btn-primary" style="display:none">Apply Effect</button>
+        </div>
+
+        <!-- Per-key custom section (shown when Custom effect is active) -->
+        <div id="perkey-section" style="display:none">
+          <div class="perkey-toolbar">
+            <label class="control-label" style="margin:0">Brush Colour</label>
+            <input type="color" id="brush-color" value="#ffffff" class="color-swatch" />
+            <input type="text" id="brush-hex" value="#ffffff" class="hex-input" maxlength="7" spellcheck="false" />
+            <div style="flex:1"></div>
+            <button class="btn-secondary" id="btn-fill-keys">Fill Keys</button>
+            <button class="btn-secondary" id="btn-fill-all">Fill All</button>
+            <button class="btn-secondary" id="btn-clear-all">Clear All</button>
+            <button class="btn-secondary" id="btn-fill-strip">Fill Strip</button>
+            <button class="btn-secondary" id="btn-clear-strip">Clear Strip</button>
+            <button class="btn-secondary" id="btn-animate-strip">Animate Strip</button>
+          </div>
+
+          <div class="keyboard-wrap">
+            <div class="kb-modules">
+
+              <!-- Main 65% board with perimeter strip -->
+              <div class="strip-wrapper">
+                <div class="strip-rail strip-rail-top" id="main-strip-top"></div>
+                <div class="strip-wrapper-mid">
+                  <div class="strip-rail strip-rail-side" id="main-strip-left"></div>
+                  <div class="keyboard" id="kb-layout">
+                    <!-- Row 0 -->
+                    <div class="key-row">
+                      <div class="key w1"   data-key="0"  title="Esc">Esc</div>
+                      <div class="key w1"   data-key="1"  title="1">1</div>
+                      <div class="key w1"   data-key="2"  title="2">2</div>
+                      <div class="key w1"   data-key="3"  title="3">3</div>
+                      <div class="key w1"   data-key="4"  title="4">4</div>
+                      <div class="key w1"   data-key="5"  title="5">5</div>
+                      <div class="key w1"   data-key="6"  title="6">6</div>
+                      <div class="key w1"   data-key="7"  title="7">7</div>
+                      <div class="key w1"   data-key="8"  title="8">8</div>
+                      <div class="key w1"   data-key="9"  title="9">9</div>
+                      <div class="key w1"   data-key="10" title="0">0</div>
+                      <div class="key w1"   data-key="11" title="-">-</div>
+                      <div class="key w1"   data-key="12" title="=">=</div>
+                      <div class="key w2"   data-key="13" title="Backspace">BkSp</div>
+                    </div>
+                    <!-- Row 1 -->
+                    <div class="key-row">
+                      <div class="key w15"  data-key="14" title="Tab">Tab</div>
+                      <div class="key w1"   data-key="15" title="Q">Q</div>
+                      <div class="key w1"   data-key="16" title="W">W</div>
+                      <div class="key w1"   data-key="17" title="E">E</div>
+                      <div class="key w1"   data-key="18" title="R">R</div>
+                      <div class="key w1"   data-key="19" title="T">T</div>
+                      <div class="key w1"   data-key="20" title="Y">Y</div>
+                      <div class="key w1"   data-key="21" title="U">U</div>
+                      <div class="key w1"   data-key="22" title="I">I</div>
+                      <div class="key w1"   data-key="23" title="O">O</div>
+                      <div class="key w1"   data-key="24" title="P">P</div>
+                      <div class="key w1"   data-key="25" title="[">[</div>
+                      <div class="key w1"   data-key="26" title="]">]</div>
+                      <div class="key w15"  data-key="27" title="\">\</div>
+                    </div>
+                    <!-- Row 2 -->
+                    <div class="key-row">
+                      <div class="key w175" data-key="28" title="CapsLock">Caps</div>
+                      <div class="key w1"   data-key="29" title="A">A</div>
+                      <div class="key w1"   data-key="30" title="S">S</div>
+                      <div class="key w1"   data-key="31" title="D">D</div>
+                      <div class="key w1"   data-key="32" title="F">F</div>
+                      <div class="key w1"   data-key="33" title="G">G</div>
+                      <div class="key w1"   data-key="34" title="H">H</div>
+                      <div class="key w1"   data-key="35" title="J">J</div>
+                      <div class="key w1"   data-key="36" title="K">K</div>
+                      <div class="key w1"   data-key="37" title="L">L</div>
+                      <div class="key w1"   data-key="38" title=";">;</div>
+                      <div class="key w1"   data-key="39" title="'">'</div>
+                      <div class="key wenter" data-key="40" title="Enter">Enter</div>
+                    </div>
+                    <!-- Row 3 -->
+                    <div class="key-row">
+                      <div class="key w2"   data-key="41" title="Left Shift">Shift</div>
+                      <div class="key w1"   data-key="42" title="Z">Z</div>
+                      <div class="key w1"   data-key="43" title="X">X</div>
+                      <div class="key w1"   data-key="44" title="C">C</div>
+                      <div class="key w1"   data-key="45" title="V">V</div>
+                      <div class="key w1"   data-key="46" title="B">B</div>
+                      <div class="key w1"   data-key="47" title="N">N</div>
+                      <div class="key w1"   data-key="48" title="M">M</div>
+                      <div class="key w1"   data-key="49" title=",">,</div>
+                      <div class="key w1"   data-key="50" title=".">.</div>
+                      <div class="key w1"   data-key="51" title="/">/</div>
+                      <div class="key w1"   data-key="52" title="Right Shift">Sft</div>
+                      <div class="key w1"   data-key="53" title="Up">↑</div>
+                      <div class="key w1"   data-key="54" title="Delete">Del</div>
+                    </div>
+                    <!-- Row 4 -->
+                    <div class="key-row">
+                      <div class="key w125" data-key="55" title="Left Ctrl">Ctrl</div>
+                      <div class="key w1"   data-key="56" title="Left Win">Win</div>
+                      <div class="key w125" data-key="57" title="Left Alt">Alt</div>
+                      <div class="key wspace" data-key="58" title="Space">Space</div>
+                      <div class="key w1"   data-key="59" title="Right Alt">Alt</div>
+                      <div class="key w1"   data-key="60" title="Fn">Fn</div>
+                      <div class="key w1"   data-key="61" title="Left">←</div>
+                      <div class="key w1"   data-key="62" title="Down">↓</div>
+                      <div class="key w1"   data-key="63" title="Right">→</div>
+                    </div>
+                  </div>
+                  <div class="strip-rail strip-rail-side" id="main-strip-right"></div>
+                </div>
+                <div class="strip-rail strip-rail-bottom" id="main-strip-bottom"></div>
+              </div>
+
+              <!-- Numpad module with perimeter strip -->
+              <div id="numpad-module" style="display:none">
+                <div class="strip-wrapper">
+                  <div class="strip-rail strip-rail-top" id="np-strip-top"></div>
+                  <div class="strip-wrapper-mid">
+                    <div class="strip-rail strip-rail-side" id="np-strip-left"></div>
+                    <div>
+                      <div class="numpad-label">Numpad Module</div>
+                      <div class="keyboard numpad-grid" id="np-layout">
+                        <div class="key" data-np="0"  title="Num Lock">NL</div>
+                        <div class="key" data-np="1"  title="/">/</div>
+                        <div class="key" data-np="2"  title="*">*</div>
+                        <div class="key" data-np="3"  title="-">−</div>
+                        <div class="key" data-np="4"  title="7">7</div>
+                        <div class="key" data-np="5"  title="8">8</div>
+                        <div class="key" data-np="6"  title="9">9</div>
+                        <div class="key" data-np="7"  title="+">+</div>
+                        <div class="key" data-np="8"  title="4">4</div>
+                        <div class="key" data-np="9"  title="5">5</div>
+                        <div class="key" data-np="10" title="6">6</div>
+                        <div class="key" data-np="11" title="1">1</div>
+                        <div class="key" data-np="12" title="2">2</div>
+                        <div class="key" data-np="13" title="3">3</div>
+                        <div class="key" data-np="14" title="Enter">Ent</div>
+                        <div class="key" data-np="15" title="0">0</div>
+                        <div class="key" data-np="16" title=".">.</div>
+                      </div>
+                    </div>
+                    <div class="strip-rail strip-rail-side" id="np-strip-right"></div>
+                  </div>
+                  <div class="strip-rail strip-rail-bottom" id="np-strip-bottom"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="perkey-numpad-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" id="toggle-numpad" />
+              <span>Show Numpad Module</span>
+            </label>
+          </div>
+
+          <!-- Presets -->
+          <div class="preset-bar">
+            <div class="preset-save-row">
+              <input type="text" id="preset-name" class="hex-input" placeholder="Preset name" style="width:180px" spellcheck="false" />
+              <button class="btn-secondary" id="btn-save-preset">Save Preset</button>
+            </div>
+            <div id="preset-list" class="preset-list"></div>
+          </div>
+
+          <div class="action-row" style="margin-top:16px">
+            <div id="perkey-status" class="status-msg"></div>
+            <button id="btn-apply-custom" class="btn-primary" style="display:none">Apply to Keyboard</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- PROFILES TAB (commented out)
+      <section id="tab-profiles" class="tab">
+        ...
+      </section>
+      -->
+
+
+      <!-- ── MINECRAFT TAB ──────────────────────────────────────────────── -->
+      <section id="tab-minecraft" class="tab">
+        <div class="tab-header">
+          <h2>Minecraft Mode</h2>
+          <p class="subtitle">Reactive keyboard lighting driven by your Minecraft game state. Watches the log file and stats for deaths, damage, dimension changes and advancements.</p>
+        </div>
+
+        <!-- Toggle + status -->
+        <div class="mc-controls">
+          <div class="mc-row">
+            <div id="mc-badge" class="mc-state-badge mc-off">Inactive</div>
+            <button id="btn-mc-toggle" class="btn-primary">Start Minecraft Mode</button>
+          </div>
+        </div>
+
+        <!-- Current dimension -->
+        <div class="mc-dimension" id="mc-dimension">
+          <div class="mc-dim-label">Current Dimension</div>
+          <div class="mc-dim-cards">
+            <div class="mc-dim-card" id="mc-dim-overworld">
+              <span class="mc-dim-swatch" style="background:#22c55e"></span>
+              Overworld
+            </div>
+            <div class="mc-dim-card" id="mc-dim-nether">
+              <span class="mc-dim-swatch" style="background:#f97316"></span>
+              Nether
+            </div>
+            <div class="mc-dim-card" id="mc-dim-end">
+              <span class="mc-dim-swatch" style="background:#a855f7"></span>
+              The End
+            </div>
+          </div>
+        </div>
+
+        <!-- Lighting legend -->
+        <div class="mc-legend">
+          <div class="mc-legend-title">Lighting Reactions</div>
+          <div class="mc-legend-grid">
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#22c55e"></span><strong>Overworld</strong><span class="mc-legend-desc">Steady green</span></div>
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#f97316"></span><strong>Nether</strong><span class="mc-legend-desc">Breathing orange/red</span></div>
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#a855f7"></span><strong>The End</strong><span class="mc-legend-desc">Breathing purple</span></div>
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#ef4444"></span><strong>Death</strong><span class="mc-legend-desc">Red flash + fade</span></div>
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#fbbf24"></span><strong>Advancement</strong><span class="mc-legend-desc">Gold burst</span></div>
+            <div class="mc-legend-item"><span class="mc-swatch" style="background:#fb923c"></span><strong>Damage</strong><span class="mc-legend-desc">Quick red flash</span></div>
+          </div>
+        </div>
+
+        <!-- Event log -->
+        <div class="mc-log-section">
+          <div class="mc-legend-title">Event Log</div>
+          <div class="mc-log" id="mc-log">
+            <div class="mc-log-empty">No events yet. Start Minecraft Mode and play!</div>
+          </div>
+        </div>
+
+        <div id="mc-status" class="status-msg" style="margin-top:14px"></div>
+      </section>
+
+      <!-- ── VISUALIZER TAB ──────────────────────────────────────────────── -->
+      <section id="tab-visualizer" class="tab">
+        <div class="tab-header">
+          <h2>Audio Visualizer</h2>
+          <p class="subtitle">Turn your keyboard into a real-time audio visualizer. Uses microphone input — for system audio, route via BlackHole or similar loopback driver.</p>
+        </div>
+
+        <div class="mc-controls">
+          <div class="mc-row">
+            <div id="viz-badge" class="mc-state-badge mc-off">Inactive</div>
+            <button id="btn-viz-toggle" class="btn-primary">Start Visualizer</button>
+          </div>
+        </div>
+
+        <div class="controls-grid" style="max-width:760px; margin-top:24px">
+          <div class="control-group">
+            <label class="control-label">Sensitivity <span id="lbl-viz-sens" class="val-label">1.5</span></label>
+            <input type="range" id="slider-viz-sens" class="slider" min="0.5" max="4" step="0.1" value="1.5" />
+          </div>
+          <div class="control-group">
+            <label class="control-label">Colour Theme</label>
+            <div class="segment-group" id="viz-theme-seg">
+              <button class="seg-btn active" data-val="spectrum">Spectrum</button>
+              <button class="seg-btn" data-val="fire">Fire</button>
+              <button class="seg-btn" data-val="ocean">Ocean</button>
+              <button class="seg-btn" data-val="matrix">Matrix</button>
+            </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Smoothing <span id="lbl-viz-smooth" class="val-label">0.7</span></label>
+            <input type="range" id="slider-viz-smooth" class="slider" min="0.1" max="0.95" step="0.05" value="0.7" />
+          </div>
+
+          <div class="control-group">
+            <label class="control-label">Target</label>
+            <div class="segment-group" id="viz-target-seg">
+              <button class="seg-btn active" data-val="both">Keys + Strip</button>
+              <button class="seg-btn" data-val="keys">Keys Only</button>
+              <button class="seg-btn" data-val="strip">Strip Only</button>
+            </div>
+          </div>
+
+          <div class="control-group" id="group-viz-dir">
+            <label class="control-label">Direction</label>
+            <div class="segment-group" id="viz-dir-seg">
+              <button class="seg-btn active" data-val="bottom-up">Bottom → Up</button>
+              <button class="seg-btn" data-val="left-right">Left → Right</button>
+              <button class="seg-btn" data-val="full-row">Full Row</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="viz-preview">
+          <div class="mc-legend-title">Live Spectrum</div>
+          <div class="viz-bars" id="viz-bars"></div>
+        </div>
+
+        <div id="viz-status" class="status-msg" style="margin-top:14px"></div>
+      </section>
+
+      <!-- ── DEVICE TAB ───────────────────────────────────────────────────── -->
+      <section id="tab-device" class="tab">
+        <div class="tab-header">
+          <h2>Device Info</h2>
+          <p class="subtitle">Connected device details.</p>
+        </div>
+
+        <div id="device-list" class="device-list">
+          <div class="device-empty">No devices detected. Click <strong>Connect</strong> in the sidebar.</div>
+        </div>
+
+        <div class="info-card" style="margin-top:24px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <strong>macOS note:</strong> If the keyboard is not detected, try running the app with
+          <code>sudo</code> once so macOS grants HID access, or check
+          System Preferences → Privacy & Security → Input Monitoring.
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- First-launch modal -->
+  <div id="first-launch-overlay" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3>Welcome to MeRGB</h3>
+      <p>For the best experience, make sure your Mountain Everest 60 is running the latest firmware. You can update it using Mountain's official <strong>Base Camp</strong> software before using this app.</p>
+      <p style="margin-top:10px;font-size:12px;color:var(--text-2, #888)">Currently only the <strong>Mountain Everest 60</strong> is supported. More keyboards will be added in future updates.</p>
+      <button id="btn-dismiss-modal" class="btn-primary" style="margin-top:16px;width:100%">Got it</button>
+    </div>
+  </div>
+
+  <!-- Close-to-tray notification modal -->
+  <div id="close-tray-overlay" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3>MeRGB is still running</h3>
+      <p>The app has been minimised to your menu bar. You can click the tray icon to reopen it, or right-click and select <strong>Quit</strong> to exit completely.</p>
+      <label class="modal-check" style="margin-top:14px">
+        <input type="checkbox" id="chk-dont-show-close" />
+        <span>Don't show this again</span>
+      </label>
+      <button id="btn-dismiss-close-tray" class="btn-primary" style="margin-top:12px;width:100%">OK</button>
+    </div>
+  </div>
+
+  <script src="src/renderer.js"></script>
+</body>
+</html>
