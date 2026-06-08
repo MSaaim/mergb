@@ -86,6 +86,6 @@ jobs:
           - **Windows:** MeRGB Setup EXE
 
           Commit: ${{ github.sha }}" \
-            artifacts/**/*
+            $(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' \))
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
