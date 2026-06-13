@@ -177,8 +177,8 @@ class MountainKeyboard {
 
   _delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  // Send feature report, then read back and verify resp[1] == cmd (retry × 3)
-  async _sendAndVerify(cmd, fillFn, retries = 3) {
+  // Send feature report, then read back and verify resp[1] == cmd (retry × 5)
+  async _sendAndVerify(cmd, fillFn, retries = 5) {
     for (let attempt = 0; attempt < retries; attempt++) {
       const buf = this._buf(cmd);
       if (fillFn) fillFn(buf);
@@ -186,8 +186,14 @@ class MountainKeyboard {
       const hex = buf.slice(0, 14).toString('hex');
       console.log(`[KB] >> [${cmd.toString(16).padStart(2,'0')}] ${hex}...`);
 
-      this.device.sendFeatureReport([...buf]);
-      await this._delay(50);
+      try {
+        this.device.sendFeatureReport([...buf]);
+      } catch (e) {
+        console.log(`[KB] sendFeatureReport failed: ${e.message}`);
+        await this._delay(100);
+        continue;
+      }
+      await this._delay(80);
 
       try {
         const resp = this.device.getFeatureReport(0x00, 65);
@@ -201,12 +207,14 @@ class MountainKeyboard {
       } catch (e) {
         console.log(`[KB] getFeatureReport failed: ${e.message}`);
       }
-      await this._delay(50);
+      await this._delay(80);
     }
     console.log(`[KB] No ACK for cmd 0x${cmd.toString(16)} after ${retries} tries — continuing anyway`);
   }
 
   _startKeepalive() {
+    // Clear any existing interval before starting a new one
+    if (this._keepalive) clearInterval(this._keepalive);
     // Light keepalive — just a harmless mode-details re-send every 10s
     this._keepalive = setInterval(async () => {
       if (!this.device) return;
@@ -227,48 +235,65 @@ class MountainKeyboard {
     return Math.round(pct / 25) * 25;
   }
 
-  // Save current state to the keyboard's onboard flash (active profile)
-  async _save() {
-    try {
-      await this._delay(100);
-      await this._sendAndVerify(CMD.SAVE, (buf) => {
-        buf[5] = 0x01;
-      });
-      console.log('[KB] Saved to onboard memory');
-    } catch (e) {
-      console.log('[KB] Save to onboard memory skipped:', e.message);
+  // Save current state to the keyboard's onboard flash (active profile).
+  // effectCode: the active effect (e.g. EFFECT.STATIC=0x01, EFFECT.CUSTOM=0x07).
+  //             The firmware uses buf[5] to know WHICH effect's data to persist.
+  // Returns true if the save was ACK'd, false otherwise.
+  async _save(effectCode = EFFECT.STATIC) {
+    for (let round = 0; round < 3; round++) {
+      await this._delay(round === 0 ? 150 : 250);
+      const resp = await this._sendAndVerify(CMD.SAVE, (buf) => {
+        buf[5] = effectCode;
+      }, 5);
+      if (resp) {
+        console.log(`[KB] Saved effect 0x${effectCode.toString(16)} to onboard memory`);
+        return true;
+      }
+      console.log(`[KB] Save round ${round + 1} got no ACK — retrying`);
     }
+    console.log('[KB] WARNING: save to onboard memory failed after all attempts');
+    return false;
   }
 
   // ── Core: two-step mode setter ───────────────────────────────────────────────
+  // save: set false to skip onboard flash write (used by setCustomColors which
+  //        saves after the per-key data is fully uploaded)
   async _setMode({ effect, speed=128, brightness=255,
                    colorMode=COLOR_MODE.SINGLE,
                    color1={r:255,g:255,b:255}, color2={r:0,g:0,b:0},
-                   direction=DIRECTION.RIGHT }) {
-    // Step 1 — activate effect
-    await this._sendAndVerify(CMD.SELECT_MODE, (buf) => {
-      buf[5] = 0x01;
-      buf[9] = effect;
-    });
+                   direction=DIRECTION.RIGHT, save=true }) {
+    // Pause keepalive to prevent collisions with the multi-step sequence
+    this._stopKeepalive();
+    try {
+      // Step 1 — activate effect
+      await this._sendAndVerify(CMD.SELECT_MODE, (buf) => {
+        buf[5] = 0x01;
+        buf[9] = effect;
+      });
 
-    await this._delay(50);
+      await this._delay(60);
 
-    // Step 2 — send details
-    await this._sendAndVerify(CMD.MODE_DETAILS, (buf) => {
-      buf[5]  = effect;
-      buf[7]  = this._toStep(speed);
-      buf[8]  = this._toStep(brightness);
-      buf[9]  = colorMode;
-      buf[10] = direction;
-      if (colorMode !== COLOR_MODE.RAINBOW) {
-        buf[12] = color1.r; buf[13] = color1.g; buf[14] = color1.b;
-        if (colorMode === COLOR_MODE.DUAL) {
-          buf[15] = color2.r; buf[16] = color2.g; buf[17] = color2.b;
+      // Step 2 — send details
+      await this._sendAndVerify(CMD.MODE_DETAILS, (buf) => {
+        buf[5]  = effect;
+        buf[7]  = this._toStep(speed);
+        buf[8]  = this._toStep(brightness);
+        buf[9]  = colorMode;
+        buf[10] = direction;
+        if (colorMode !== COLOR_MODE.RAINBOW) {
+          buf[12] = color1.r; buf[13] = color1.g; buf[14] = color1.b;
+          if (colorMode === COLOR_MODE.DUAL) {
+            buf[15] = color2.r; buf[16] = color2.g; buf[17] = color2.b;
+          }
         }
-      }
-    });
+      });
 
-    await this._save();
+      if (save) await this._save(effect);
+    } finally {
+      // Only resume keepalive if we own the full lifecycle (i.e. save=true).
+      // When save=false the caller manages the keepalive.
+      if (save) this._startKeepalive();
+    }
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -307,10 +332,11 @@ class MountainKeyboard {
   }
 
   async setTornado({ color1={r:255,g:0,b:100}, color2={r:0,g:100,b:255},
-                     direction='clockwise', speed=128, brightness=255 } = {}) {
+                     colorMode='dual', direction='clockwise', speed=128, brightness=255 } = {}) {
+    const cm  = { rainbow: COLOR_MODE.RAINBOW, single: COLOR_MODE.SINGLE, dual: COLOR_MODE.DUAL };
     const dir = { clockwise: DIRECTION.CLOCKWISE, anticlockwise: DIRECTION.ANTICLOCKWISE };
     await this._setMode({ effect: EFFECT.TORNADO, speed, brightness,
-                          colorMode: COLOR_MODE.DUAL, color1, color2,
+                          colorMode: cm[colorMode] ?? COLOR_MODE.DUAL, color1, color2,
                           direction: dir[direction] ?? DIRECTION.CLOCKWISE });
   }
 
@@ -352,8 +378,13 @@ class MountainKeyboard {
     // Escape can't be addressed via MAP_DIRECT — pass its colour through
     // MODE_DETAILS so the firmware keeps it lit at the correct colour.
     const escColor = colors[0] || { r: 255, g: 255, b: 255 };
+    // save:false — don't save to flash yet; per-key data hasn't been uploaded.
+    // Saving incomplete state would write "custom mode, no key data" to flash,
+    // so the keyboard would show blank if unplugged before the real save.
+    // Keepalive stays paused (save:false keeps it stopped) until our finally block.
     await this._setMode({ effect: EFFECT.CUSTOM, brightness,
-                          colorMode: COLOR_MODE.SINGLE, color1: escColor });
+                          colorMode: COLOR_MODE.SINGLE, color1: escColor, save: false });
+    try {
     await this._delay(50);
 
     // Start
@@ -412,9 +443,16 @@ class MountainKeyboard {
       await this._delay(20);
     }
 
-    // End
+    // End — signal the firmware that the per-key upload is complete
     await this._sendAndVerify(CMD.END_DIRECT, null);
-    await this._save();
+
+    // Give firmware extra time to commit the per-key buffer before saving.
+    await this._delay(300);
+    const saved = await this._save(EFFECT.CUSTOM);
+    return { saved };
+    } finally {
+      this._startKeepalive();
+    }
   }
 
   // Fast per-key frame for visualizer — no mode activation, no ACK, no save.

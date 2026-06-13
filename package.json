@@ -49,8 +49,7 @@
     },
     "win": {
       "target": ["nsis"],
-      "icon": "assets/icon.png",
-      "publisherName": "MeRGB"
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,

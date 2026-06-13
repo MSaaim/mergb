@@ -316,7 +316,10 @@ ipcMain.handle('kb:matrix', async (_, args) => {
 });
 
 ipcMain.handle('kb:custom', async (_, { colors, numpadColors, profile, sideColors, numpadSideColors }) => {
-  try { await kb.setCustomColors(colors, profile ?? 0, numpadColors ?? null, sideColors ?? null, numpadSideColors ?? null); return { ok: true }; }
+  try {
+    const result = await kb.setCustomColors(colors, profile ?? 0, numpadColors ?? null, sideColors ?? null, numpadSideColors ?? null);
+    return { ok: true, saved: result?.saved ?? false };
+  }
   catch (e) { return { ok: false, message: e.message }; }
 });
 

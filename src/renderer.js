@@ -243,7 +243,7 @@ const effectControls = {
   wave:      { color1: false, color2: false, colormode: true,  direction: true,  speed: true,  brightness: true  },
   breathing: { color1: true,  color2: false, colormode: false, direction: false, speed: true,  brightness: true  },
   reactive:  { color1: true,  color2: true,  colormode: false, direction: false, speed: true,  brightness: true  },
-  tornado:   { color1: true,  color2: true,  colormode: false, direction: true,  speed: true,  brightness: true  },
+  tornado:   { color1: true,  color2: true,  colormode: true,  direction: true,  speed: true,  brightness: true  },
   matrix:    { color1: true,  color2: true,  colormode: false, direction: false, speed: true,  brightness: true  },
   yeti:      { color1: true,  color2: true,  colormode: false, direction: false, speed: true,  brightness: true  },
   custom:    { color1: false, color2: false, colormode: false, direction: false, speed: false, brightness: false },
@@ -259,8 +259,8 @@ function showEffectControls(effect) {
   document.getElementById('group-direction').classList.toggle('hidden', !cfg.direction);
   document.getElementById('group-speed').classList.toggle('hidden',     !cfg.speed);
   document.getElementById('group-brightness').classList.toggle('hidden',!cfg.brightness);
-  // Wave: color visibility depends on selected colour mode
-  if (effect === 'wave') {
+  // Wave & Tornado: color visibility depends on selected colour mode
+  if (effect === 'wave' || effect === 'tornado') {
     document.getElementById('group-color1').classList.toggle('hidden', state.colorMode === 'rainbow');
     document.getElementById('group-color2').classList.toggle('hidden', state.colorMode !== 'dual');
   }
@@ -322,10 +322,10 @@ function wireSegGroup(groupId, stateKey) {
 
 wireSegGroup('colormode-seg', 'colorMode');
 
-// When colour mode changes on wave, update which colour inputs are visible
+// When colour mode changes on wave/tornado, update which colour inputs are visible
 document.querySelectorAll('#colormode-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (state.activeEffect === 'wave') {
+    if (state.activeEffect === 'wave' || state.activeEffect === 'tornado') {
       document.getElementById('group-color1').classList.toggle('hidden', state.colorMode === 'rainbow');
       document.getElementById('group-color2').classList.toggle('hidden', state.colorMode !== 'dual');
     }
@@ -405,7 +405,10 @@ async function applyCustomColors() {
     profile: state.activeProfile,
   });
   if (res.ok) {
-    setStatus('perkey-status', 'Applied.', 'ok');
+    const msg = res.saved
+      ? 'Applied & saved to keyboard.'
+      : 'Applied (warning: onboard save failed — design may not persist after unplug).';
+    setStatus('perkey-status', msg, res.saved ? 'ok' : 'err');
     updateCurrentLighting('custom', state.brushColor);
     saveLightingState();
     window.appInfo.setCurrentEffect('custom');
@@ -556,7 +559,7 @@ async function applyEffect() {
       res = await window.kb.setReactive({ color1, color2, speed, brightness, profile: p });
       break;
     case 'tornado':
-      res = await window.kb.setTornado({ color1, color2, direction, speed, brightness, profile: p });
+      res = await window.kb.setTornado({ colorMode, color1, color2, direction, speed, brightness, profile: p });
       break;
     case 'matrix':
       res = await window.kb.setMatrix({ color1, color2, speed, brightness, profile: p });
