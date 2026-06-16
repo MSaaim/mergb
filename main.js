@@ -350,8 +350,33 @@ ipcMain.handle('kb:viz-frame', async (_, { colors, sideColors, numpadSideColors 
 });
 
 ipcMain.handle('desktop:get-sources', async () => {
-  const sources = await desktopCapturer.getSources({ types: ['screen'] });
-  return sources.map(s => ({ id: s.id, name: s.name }));
+  try {
+    const sources = await desktopCapturer.getSources({ types: ['screen'] });
+    return sources.map(s => ({ id: s.id, name: s.name }));
+  } catch (e) { return []; }
+});
+
+ipcMain.handle('screen:grab-frame', async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 160, height: 90 },
+    });
+    if (!sources.length) return { error: 'No screen sources. Grant Screen Recording permission in System Settings > Privacy & Security.' };
+    const thumb = sources[0].thumbnail;
+    const { width, height } = thumb.getSize();
+    if (width === 0 || height === 0) return { error: 'Screen Recording permission not granted. Enable it in System Settings > Privacy & Security > Screen Recording.' };
+    const bmp = thumb.toBitmap(); // BGRA
+    // Convert BGRA → RGBA in-place
+    for (let i = 0; i < bmp.length; i += 4) {
+      const b = bmp[i];
+      bmp[i] = bmp[i + 2];
+      bmp[i + 2] = b;
+    }
+    return { data: Buffer.from(bmp), width, height };
+  } catch (e) {
+    return { error: e.message };
+  }
 });
 
 ipcMain.handle('kb:pause-keepalive', () => {

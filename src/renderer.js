@@ -28,6 +28,7 @@ const state = {
   numpadVisible: false,
   brushColor:   { r: 255, g: 255, b: 255 },
   painting:     false,
+  ambColor:     { r: 255, g: 255, b: 255 },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -120,6 +121,51 @@ function initStripCells() {
 }
 
 initStripCells();
+
+// ── Ambience strip dot initialisation ──────────────────────────────────────
+function initAmbienceStrips() {
+  function makeDot(containerId, dataKey, idx) {
+    const dot = document.createElement('div');
+    dot.className = 'strip-dot';
+    dot.dataset[dataKey] = idx;
+    dot.title = `LED ${idx + 1}`;
+    document.getElementById(containerId).appendChild(dot);
+  }
+  function fillRing(prefix, dataKey, dist) {
+    let idx = 0;
+    const rails = [['top', dist.top], ['right', dist.right], ['bottom', dist.bottom], ['left', dist.left]];
+    for (const [edge, n] of rails) {
+      if (edge === 'bottom' || edge === 'left') {
+        const indices = [];
+        for (let i = 0; i < n; i++) indices.push(idx++);
+        for (let i = indices.length - 1; i >= 0; i--) makeDot(`${prefix}-${edge}`, dataKey, indices[i]);
+      } else {
+        for (let i = 0; i < n; i++) makeDot(`${prefix}-${edge}`, dataKey, idx++);
+      }
+    }
+  }
+  fillRing('amb-strip', 'ambStrip',   distributeRing(MAIN_SIDE_COUNT,   { wide: true  }));
+  fillRing('amb-np-strip', 'ambNpStrip', distributeRing(NUMPAD_SIDE_COUNT, { wide: false }));
+}
+initAmbienceStrips();
+
+// Paint the ambience keyboard visual from the current custom state arrays
+function paintAmbienceVisual() {
+  document.querySelectorAll('#amb-kb-layout .key').forEach(el => {
+    const idx = parseInt(el.dataset.key);
+    if (state.keyColors[idx]) paintKeyEl(el, state.keyColors[idx]);
+  });
+  document.querySelectorAll('#amb-np-layout .key').forEach(el => {
+    const idx = parseInt(el.dataset.np);
+    if (state.numpadColors[idx]) paintKeyEl(el, state.numpadColors[idx]);
+  });
+  document.querySelectorAll('[data-amb-strip]').forEach(el => {
+    paintStripEl(el, state.sideColors[parseInt(el.dataset.ambStrip)]);
+  });
+  document.querySelectorAll('[data-amb-np-strip]').forEach(el => {
+    paintStripEl(el, state.numpadSideColors[parseInt(el.dataset.ambNpStrip)]);
+  });
+}
 
 // ── Connection ─────────────────────────────────────────────────────────────
 const connBadge = document.getElementById('conn-badge');
@@ -234,6 +280,7 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
 
     if (btn.dataset.tab === 'device') refreshDeviceTab();
+    if (btn.dataset.tab === 'ambience') paintAmbienceVisual();
   });
 });
 
@@ -483,6 +530,13 @@ function applyModeToUI(mode) {
   // Current indicator
   updateCurrentLighting(state.activeEffect, state.color1);
 
+  // Restore ambience settings
+  if (mode.ambColor) {
+    state.ambColor = { ...mode.ambColor };
+    document.getElementById('amb-color').value = rgbToHex(state.ambColor);
+    document.getElementById('amb-color-hex').value = rgbToHex(state.ambColor);
+  }
+
   // Restore custom per-key data if saved
   if (state.activeEffect === 'custom') {
     if (mode.keyColors) mode.keyColors.forEach((c, i) => { state.keyColors[i] = { ...c }; });
@@ -496,7 +550,16 @@ function applyModeToUI(mode) {
     }
     paintCustomVisual();
     if (mode.animated) {
-      applyCustomColors().then(() => startStripAnim());
+      // Switch to ambience tab and start animation
+      document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      const ambBtn = document.querySelector('.nav-btn[data-tab="ambience"]');
+      if (ambBtn) ambBtn.classList.add('active');
+      document.getElementById('tab-ambience')?.classList.add('active');
+      applyCustomColors().then(() => {
+        paintAmbienceVisual();
+        startStripAnim();
+      });
     } else {
       scheduleCustomApply(100);
     }
@@ -515,6 +578,7 @@ function saveLightingState() {
     brightness: state.brightness,
     colorMode: state.colorMode,
     direction: state.direction,
+    ambColor: { ...state.ambColor },
   };
   if (state.activeEffect === 'custom') {
     s.keyColors = state.keyColors.map(c => ({ ...c }));
@@ -792,51 +856,44 @@ const numpadDist = distributeRing(NUMPAD_SIDE_COUNT, { wide: false });
 const mainPaths   = buildSplitPaths(MAIN_SIDE_COUNT,   mainDist);
 const numpadPaths = buildSplitPaths(NUMPAD_SIDE_COUNT, numpadDist);
 
-const ANIM_SPEED = 10;
-const ANIM_SMOOTHING = 100;
-
 function stopStripAnim() {
   if (_stripAnimId) { cancelAnimationFrame(_stripAnimId); _stripAnimId = null; }
-  document.getElementById('btn-animate-strip').textContent = 'Animate Strip';
+  document.getElementById('btn-amb-toggle').textContent = 'Start Animation';
 }
 
 function startStripAnim() {
-  const off = { r: 0, g: 0, b: 0 };
   const mainMaxLen = Math.max(mainPaths.right.length, mainPaths.left.length);
   const npMaxLen   = Math.max(numpadPaths.right.length, numpadPaths.left.length);
   const npScale = npMaxLen / mainMaxLen;
 
-  // Persistent glow buffers for smoothing (exponential decay)
   const mainGlow = Array.from({ length: MAIN_SIDE_COUNT }, () => 0);
   const npGlow   = Array.from({ length: NUMPAD_SIDE_COUNT }, () => 0);
   let lastTs = null;
   let sending = false;
 
-  document.getElementById('btn-animate-strip').textContent = 'Stop Animation';
+  document.getElementById('btn-amb-toggle').textContent = 'Stop Animation';
 
   function frame(ts) {
     if (!_stripAnimId) return;
     if (!lastTs) lastTs = ts;
-    const dt = Math.min(ts - lastTs, 50); // cap delta to avoid jumps
+    const dt = Math.min(ts - lastTs, 50);
     lastTs = ts;
 
-    const rgb = state.brushColor;
-    const speed = 0.02 + (ANIM_SPEED - 5) * (0.12 / 95);
-    const decayPerMs = 0.5 - (ANIM_SMOOTHING / 100) * 0.47;
+    const rgb = state.ambColor;
+    const speed = 0.02 + (10 - 5) * (0.12 / 95);
+    const decayPerMs = 0.5 - (100 / 100) * 0.47;
     const decay = Math.pow(decayPerMs, dt / 16.67);
 
-    const tailMain = Math.round(2 + (ANIM_SMOOTHING / 100) * 8);
+    const tailMain = Math.round(2 + (100 / 100) * 8);
     const tailNp   = Math.max(1, Math.round(tailMain * 0.5));
 
     const elapsed = ts;
     const mainPos = (elapsed * speed) % (mainMaxLen + tailMain);
     const npPos   = mainPos * npScale;
 
-    // Decay existing glow
     for (let i = 0; i < mainGlow.length; i++) mainGlow[i] *= decay;
     for (let i = 0; i < npGlow.length; i++)   npGlow[i] *= decay;
 
-    // Apply new trail on top
     function stampTrail(paths, glow, pos, tail) {
       for (const path of [paths.right, paths.left]) {
         for (let t = 0; t < tail; t++) {
@@ -851,7 +908,6 @@ function startStripAnim() {
     stampTrail(mainPaths, mainGlow, mainPos, tailMain);
     if (state.numpadVisible) stampTrail(numpadPaths, npGlow, npPos, tailNp);
 
-    // Build colour arrays from glow buffers
     const mainColors = mainGlow.map(g => ({
       r: Math.round(rgb.r * g), g: Math.round(rgb.g * g), b: Math.round(rgb.b * g),
     }));
@@ -859,19 +915,16 @@ function startStripAnim() {
       r: Math.round(rgb.r * g), g: Math.round(rgb.g * g), b: Math.round(rgb.b * g),
     }));
 
-    // Update state + UI
-    mainColors.forEach((c, i) => state.sideColors[i] = c);
-    document.querySelectorAll('[data-strip]').forEach(el => {
-      paintStripEl(el, state.sideColors[parseInt(el.dataset.strip)]);
+    // Update ambience tab strip visuals
+    document.querySelectorAll('[data-amb-strip]').forEach(el => {
+      paintStripEl(el, mainColors[parseInt(el.dataset.ambStrip)]);
     });
     if (state.numpadVisible) {
-      npColors.forEach((c, i) => state.numpadSideColors[i] = c);
-      document.querySelectorAll('[data-np-strip]').forEach(el => {
-        paintStripEl(el, state.numpadSideColors[parseInt(el.dataset.npStrip)]);
+      document.querySelectorAll('[data-amb-np-strip]').forEach(el => {
+        paintStripEl(el, npColors[parseInt(el.dataset.ambNpStrip)]);
       });
     }
 
-    // Send to hardware (skip frame if previous send still in flight)
     if (state.connected && !sending) {
       sending = true;
       window.kb.sendVizFrame({
@@ -887,15 +940,50 @@ function startStripAnim() {
   _stripAnimId = requestAnimationFrame(frame);
 }
 
-document.getElementById('btn-animate-strip').addEventListener('click', () => {
-  if (_stripAnimId) { stopStripAnim(); return; }
+// ── Ambience tab controls ─────────────────────────────────────────────────
+const ambSwatch = document.getElementById('amb-color');
+const ambHexIn  = document.getElementById('amb-color-hex');
+
+ambSwatch.addEventListener('input', () => {
+  const rgb = hexToRgb(ambSwatch.value);
+  if (rgb) { state.ambColor = rgb; ambHexIn.value = ambSwatch.value; }
+});
+ambHexIn.addEventListener('input', () => {
+  const v = ambHexIn.value.startsWith('#') ? ambHexIn.value : '#' + ambHexIn.value;
+  const rgb = hexToRgb(v);
+  if (rgb) { state.ambColor = rgb; ambSwatch.value = rgbToHex(rgb); }
+});
+
+
+document.getElementById('btn-amb-toggle').addEventListener('click', async () => {
+  if (_stripAnimId) {
+    stopStripAnim();
+    saveLightingState();
+    return;
+  }
+  if (!state.connected) {
+    setStatus('amb-status', 'Not connected — click Connect first.', 'err');
+    return;
+  }
+  await applyCustomColors();
+  paintAmbienceVisual();
   startStripAnim();
+  saveLightingState();
+});
+
+document.getElementById('amb-toggle-numpad').addEventListener('change', e => {
+  state.numpadVisible = e.target.checked;
+  document.getElementById('numpad-module').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('amb-numpad-module').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('toggle-numpad').checked = e.target.checked;
 });
 
 // Numpad toggle
 document.getElementById('toggle-numpad').addEventListener('change', e => {
   state.numpadVisible = e.target.checked;
   document.getElementById('numpad-module').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('amb-numpad-module').style.display = e.target.checked ? 'flex' : 'none';
+  document.getElementById('amb-toggle-numpad').checked = e.target.checked;
 });
 
 document.getElementById('btn-apply-custom').addEventListener('click', () => applyCustomColors());
@@ -962,15 +1050,8 @@ async function applyPreset(preset) {
     document.getElementById('brush-hex').value = rgbToHex(state.brushColor);
   }
   paintCustomVisual();
-  // Stop any running animation, then restart if preset had it
-  stopStripAnim();
-  if (preset.animated) {
-    // Activate custom mode on the keyboard first, then start animation
-    await applyCustomColors();
-    startStripAnim();
-  } else {
-    scheduleCustomApply(100);
-  }
+  if (_stripAnimId) stopStripAnim();
+  scheduleCustomApply(100);
   setStatus('perkey-status', `Loaded "${preset.name}"`, 'ok');
 }
 
@@ -984,7 +1065,6 @@ document.getElementById('btn-save-preset').addEventListener('click', async () =>
     sideColors: state.sideColors.map(c => ({ ...c })),
     numpadSideColors: state.numpadSideColors.map(c => ({ ...c })),
     brushColor: { ...state.brushColor },
-    animated: !!_stripAnimId,
   });
   await window.kb.savePresets(presets);
   renderPresets();
@@ -1452,7 +1532,221 @@ origEffectClick.forEach(card => {
 
 // Stop on disconnect
 window.kb.onAutoDisconnected(() => {
+  if (_stripAnimId) stopStripAnim();
   if (audioViz.active) stopAudioViz();
+  if (screenAmb.active) stopScreenAmb();
+});
+
+// ── Screen Ambience ──────────────────────────────────────────────────────
+
+const SCR_W = 64, SCR_H = 36;
+
+const screenAmb = {
+  active: false,
+  stream: null,
+  video: null,
+  canvas: null,
+  ctx: null,
+  saturation: 1.5,
+  smoothing: 0.97,
+  currentColor: { r: 0, g: 0, b: 0 },
+  sending: false,
+};
+
+function screenDominantColor(data, sat) {
+  // Bucket pixels into a coarse 4x4x4 colour cube, then pick the most
+  // saturated bucket (highest distance from grey) that has enough pixels.
+  const SHIFT = 6; // 256 >> 6 = 4 buckets per channel
+  const SIZE = 4;
+  const buckets = new Uint32Array(SIZE * SIZE * SIZE);
+  const sums = new Float64Array(SIZE * SIZE * SIZE * 3);
+  const total = data.length / 4;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const ri = data[i] >> SHIFT, gi = data[i + 1] >> SHIFT, bi = data[i + 2] >> SHIFT;
+    const idx = ri * SIZE * SIZE + gi * SIZE + bi;
+    buckets[idx]++;
+    const s = idx * 3;
+    sums[s] += data[i]; sums[s + 1] += data[i + 1]; sums[s + 2] += data[i + 2];
+  }
+
+  // Find the bucket with the highest "vibrancy" score (saturation * count weight)
+  const minCount = total * 0.02; // bucket must have ≥2% of pixels
+  let bestScore = -1, bestR = 0, bestG = 0, bestB = 0;
+
+  for (let idx = 0; idx < buckets.length; idx++) {
+    if (buckets[idx] < minCount) continue;
+    const s = idx * 3;
+    const n = buckets[idx];
+    const r = sums[s] / n, g = sums[s + 1] / n, b = sums[s + 2] / n;
+    const avg = (r + g + b) / 3;
+    const saturation = Math.sqrt((r - avg) ** 2 + (g - avg) ** 2 + (b - avg) ** 2);
+    const brightness = Math.max(r, g, b);
+    // Score = saturation weighted by brightness and bucket size
+    const score = saturation * (0.5 + brightness / 510) * Math.sqrt(n / total);
+    if (score > bestScore) {
+      bestScore = score; bestR = r; bestG = g; bestB = b;
+    }
+  }
+
+  // If nothing vivid found, fall back to plain average
+  if (bestScore <= 0) {
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; }
+    bestR = r / total; bestG = g / total; bestB = b / total;
+  }
+
+  // Boost saturation + brightness
+  const avg = (bestR + bestG + bestB) / 3;
+  let r = avg + (bestR - avg) * sat;
+  let g = avg + (bestG - avg) * sat;
+  let b = avg + (bestB - avg) * sat;
+
+  // Lift brightness so the LED is vivid
+  const peak = Math.max(r, g, b, 1);
+  const lift = Math.min(255 / peak, 2.0); // up to 2× brighter
+  return {
+    r: Math.round(Math.max(0, Math.min(255, r * lift))),
+    g: Math.round(Math.max(0, Math.min(255, g * lift))),
+    b: Math.round(Math.max(0, Math.min(255, b * lift))),
+  };
+}
+
+async function startScreenAmb() {
+  if (!state.connected) {
+    setStatus('screen-status', 'Not connected — click Connect first.', 'err');
+    return;
+  }
+
+  let sources;
+  try { sources = await window.desktop.getSources(); } catch (_) { sources = []; }
+  if (!sources.length) {
+    setStatus('screen-status', 'No screen sources. Grant Screen Recording in System Settings > Privacy & Security.', 'err');
+    return;
+  }
+
+  try {
+    screenAmb.stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sources[0].id,
+          maxWidth: 320,
+          maxHeight: 180,
+          maxFrameRate: 10,
+        }
+      }
+    });
+  } catch (e) {
+    setStatus('screen-status', 'Capture failed: ' + e.message, 'err');
+    return;
+  }
+
+  const video = document.createElement('video');
+  video.srcObject = screenAmb.stream;
+  video.muted = true;
+  video.play();
+  screenAmb.video = video;
+
+  screenAmb.canvas = document.createElement('canvas');
+  screenAmb.canvas.width = SCR_W;
+  screenAmb.canvas.height = SCR_H;
+  screenAmb.ctx = screenAmb.canvas.getContext('2d', { willReadFrequently: true });
+
+  screenAmb.currentColor = { r: 0, g: 0, b: 0 };
+  screenAmb.sending = false;
+
+  await window.kb.pauseKeepalive();
+  await window.kb.setCustom({
+    colors: Array.from({ length: 64 }, () => ({ r: 0, g: 0, b: 0 })),
+    sideColors: Array.from({ length: MAIN_SIDE_COUNT }, () => ({ r: 0, g: 0, b: 0 })),
+    numpadColors: null, numpadSideColors: null, profile: state.activeProfile,
+  });
+
+  screenAmb.active = true;
+  document.getElementById('screen-badge').textContent = 'Active';
+  document.getElementById('screen-badge').className = 'mc-state-badge mc-active';
+  document.getElementById('btn-screen-toggle').textContent = 'Stop';
+
+  screenAmbFrame();
+}
+
+async function stopScreenAmb() {
+  screenAmb.active = false;
+  if (screenAmb.stream) { screenAmb.stream.getTracks().forEach(t => t.stop()); screenAmb.stream = null; }
+  if (screenAmb.video) { screenAmb.video.pause(); screenAmb.video.srcObject = null; screenAmb.video = null; }
+  screenAmb.canvas = null;
+  screenAmb.ctx = null;
+  await window.kb.resumeKeepalive();
+
+  document.getElementById('screen-badge').textContent = 'Inactive';
+  document.getElementById('screen-badge').className = 'mc-state-badge mc-off';
+  document.getElementById('btn-screen-toggle').textContent = 'Start Screen Ambience';
+}
+
+function screenAmbFrame() {
+  if (!screenAmb.active) return;
+  const { video, ctx } = screenAmb;
+  if (!video || !ctx) return;
+
+  // Sample dominant screen colour from tiny offscreen canvas
+  ctx.drawImage(video, 0, 0, SCR_W, SCR_H);
+  const data = ctx.getImageData(0, 0, SCR_W, SCR_H).data;
+  const target = screenDominantColor(data, screenAmb.saturation);
+
+  // Smooth transition toward target
+  const sm = screenAmb.smoothing;
+  const c = screenAmb.currentColor;
+  screenAmb.currentColor = {
+    r: Math.round(c.r * sm + target.r * (1 - sm)),
+    g: Math.round(c.g * sm + target.g * (1 - sm)),
+    b: Math.round(c.b * sm + target.b * (1 - sm)),
+  };
+
+  // Update swatch in UI
+  const hex = rgbToHex(screenAmb.currentColor);
+  document.getElementById('screen-swatch').style.background = hex;
+  document.getElementById('screen-hex').textContent = hex;
+
+  // Fill entire keyboard with the one colour
+  const col = { ...screenAmb.currentColor };
+  const keyColors = Array.from({ length: 64 }, () => ({ ...col }));
+  const stripColors = Array.from({ length: MAIN_SIDE_COUNT }, () => ({ ...col }));
+
+  if (state.connected && !screenAmb.sending) {
+    screenAmb.sending = true;
+    window.kb.sendVizFrame({
+      colors: keyColors,
+      sideColors: stripColors,
+      numpadSideColors: null,
+    }).finally(() => { screenAmb.sending = false; });
+  }
+
+  requestAnimationFrame(screenAmbFrame);
+}
+
+// Screen Ambience UI wiring
+document.getElementById('btn-screen-toggle').addEventListener('click', () => {
+  if (screenAmb.active) stopScreenAmb();
+  else startScreenAmb();
+});
+
+document.getElementById('slider-screen-sat').addEventListener('input', (e) => {
+  screenAmb.saturation = parseFloat(e.target.value);
+  document.getElementById('lbl-screen-sat').textContent = screenAmb.saturation.toFixed(1);
+});
+
+document.getElementById('slider-screen-smooth').addEventListener('input', (e) => {
+  screenAmb.smoothing = parseFloat(e.target.value);
+  document.getElementById('lbl-screen-smooth').textContent = screenAmb.smoothing.toFixed(2);
+});
+
+// Stop screen ambience when switching to another effect
+origEffectClick.forEach(card => {
+  card.addEventListener('click', () => {
+    if (screenAmb.active) stopScreenAmb();
+  });
 });
 
 // ── Device tab ─────────────────────────────────────────────────────────────

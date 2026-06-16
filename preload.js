@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('kb', {
 
 contextBridge.exposeInMainWorld('desktop', {
   getSources: () => ipcRenderer.invoke('desktop:get-sources'),
+  grabFrame:  () => ipcRenderer.invoke('screen:grab-frame'),
 });
 
 contextBridge.exposeInMainWorld('appInfo', {

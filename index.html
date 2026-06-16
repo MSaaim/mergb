@@ -34,6 +34,12 @@
         </svg>
         Lighting
       </button>
+      <button class="nav-btn" data-tab="ambience">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>
+        </svg>
+        Ambience
+      </button>
       <!-- <button class="nav-btn" data-tab="profiles">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -41,6 +47,14 @@
         </svg>
         Profiles
       </button> -->
+      <button class="nav-btn" data-tab="screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        Screen
+      </button>
       <button class="nav-btn" data-tab="minecraft">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="4" y="4" width="16" height="16" rx="2"/>
@@ -205,7 +219,6 @@
             <button class="btn-secondary" id="btn-clear-all">Clear All</button>
             <button class="btn-secondary" id="btn-fill-strip">Fill Strip</button>
             <button class="btn-secondary" id="btn-clear-strip">Clear Strip</button>
-            <button class="btn-secondary" id="btn-animate-strip">Animate Strip</button>
           </div>
 
           <div class="keyboard-wrap">
@@ -363,12 +376,205 @@
 
       </section>
 
+      <!-- ── AMBIENCE TAB ────────────────────────────────────────────────── -->
+      <section id="tab-ambience" class="tab">
+        <div class="tab-header">
+          <h2>Ambience</h2>
+          <p class="subtitle">Animate the LED strip around your keyboard while keeping your custom key layout.</p>
+        </div>
+
+        <div class="perkey-toolbar">
+          <label class="control-label" style="margin:0">Animation Colour</label>
+          <input type="color" id="amb-color" value="#ffffff" class="color-swatch" />
+          <input type="text" id="amb-color-hex" value="#ffffff" class="hex-input" maxlength="7" spellcheck="false" />
+          <div style="flex:1"></div>
+          <button class="btn-primary" id="btn-amb-toggle">Start Animation</button>
+        </div>
+
+
+        <div class="keyboard-wrap">
+          <div class="kb-modules">
+
+            <!-- Main 65% board with perimeter strip -->
+            <div class="strip-wrapper">
+              <div class="strip-rail strip-rail-top" id="amb-strip-top"></div>
+              <div class="strip-wrapper-mid">
+                <div class="strip-rail strip-rail-side" id="amb-strip-left"></div>
+                <div class="keyboard" id="amb-kb-layout">
+                  <!-- Row 0 -->
+                  <div class="key-row">
+                    <div class="key w1"   data-key="0"  title="Esc">Esc</div>
+                    <div class="key w1"   data-key="1"  title="1">1</div>
+                    <div class="key w1"   data-key="2"  title="2">2</div>
+                    <div class="key w1"   data-key="3"  title="3">3</div>
+                    <div class="key w1"   data-key="4"  title="4">4</div>
+                    <div class="key w1"   data-key="5"  title="5">5</div>
+                    <div class="key w1"   data-key="6"  title="6">6</div>
+                    <div class="key w1"   data-key="7"  title="7">7</div>
+                    <div class="key w1"   data-key="8"  title="8">8</div>
+                    <div class="key w1"   data-key="9"  title="9">9</div>
+                    <div class="key w1"   data-key="10" title="0">0</div>
+                    <div class="key w1"   data-key="11" title="-">-</div>
+                    <div class="key w1"   data-key="12" title="=">=</div>
+                    <div class="key w2"   data-key="13" title="Backspace">BkSp</div>
+                  </div>
+                  <!-- Row 1 -->
+                  <div class="key-row">
+                    <div class="key w15"  data-key="14" title="Tab">Tab</div>
+                    <div class="key w1"   data-key="15" title="Q">Q</div>
+                    <div class="key w1"   data-key="16" title="W">W</div>
+                    <div class="key w1"   data-key="17" title="E">E</div>
+                    <div class="key w1"   data-key="18" title="R">R</div>
+                    <div class="key w1"   data-key="19" title="T">T</div>
+                    <div class="key w1"   data-key="20" title="Y">Y</div>
+                    <div class="key w1"   data-key="21" title="U">U</div>
+                    <div class="key w1"   data-key="22" title="I">I</div>
+                    <div class="key w1"   data-key="23" title="O">O</div>
+                    <div class="key w1"   data-key="24" title="P">P</div>
+                    <div class="key w1"   data-key="25" title="[">[</div>
+                    <div class="key w1"   data-key="26" title="]">]</div>
+                    <div class="key w15"  data-key="27" title="\">\</div>
+                  </div>
+                  <!-- Row 2 -->
+                  <div class="key-row">
+                    <div class="key w175" data-key="28" title="CapsLock">Caps</div>
+                    <div class="key w1"   data-key="29" title="A">A</div>
+                    <div class="key w1"   data-key="30" title="S">S</div>
+                    <div class="key w1"   data-key="31" title="D">D</div>
+                    <div class="key w1"   data-key="32" title="F">F</div>
+                    <div class="key w1"   data-key="33" title="G">G</div>
+                    <div class="key w1"   data-key="34" title="H">H</div>
+                    <div class="key w1"   data-key="35" title="J">J</div>
+                    <div class="key w1"   data-key="36" title="K">K</div>
+                    <div class="key w1"   data-key="37" title="L">L</div>
+                    <div class="key w1"   data-key="38" title=";">;</div>
+                    <div class="key w1"   data-key="39" title="'">'</div>
+                    <div class="key wenter" data-key="40" title="Enter">Enter</div>
+                  </div>
+                  <!-- Row 3 -->
+                  <div class="key-row">
+                    <div class="key w2"   data-key="41" title="Left Shift">Shift</div>
+                    <div class="key w1"   data-key="42" title="Z">Z</div>
+                    <div class="key w1"   data-key="43" title="X">X</div>
+                    <div class="key w1"   data-key="44" title="C">C</div>
+                    <div class="key w1"   data-key="45" title="V">V</div>
+                    <div class="key w1"   data-key="46" title="B">B</div>
+                    <div class="key w1"   data-key="47" title="N">N</div>
+                    <div class="key w1"   data-key="48" title="M">M</div>
+                    <div class="key w1"   data-key="49" title=",">,</div>
+                    <div class="key w1"   data-key="50" title=".">.</div>
+                    <div class="key w1"   data-key="51" title="/">/</div>
+                    <div class="key w1"   data-key="52" title="Right Shift">Sft</div>
+                    <div class="key w1"   data-key="53" title="Up">&#8593;</div>
+                    <div class="key w1"   data-key="54" title="Delete">Del</div>
+                  </div>
+                  <!-- Row 4 -->
+                  <div class="key-row">
+                    <div class="key w125" data-key="55" title="Left Ctrl">Ctrl</div>
+                    <div class="key w1"   data-key="56" title="Left Win">Win</div>
+                    <div class="key w125" data-key="57" title="Left Alt">Alt</div>
+                    <div class="key wspace" data-key="58" title="Space">Space</div>
+                    <div class="key w1"   data-key="59" title="Right Alt">Alt</div>
+                    <div class="key w1"   data-key="60" title="Fn">Fn</div>
+                    <div class="key w1"   data-key="61" title="Left">&#8592;</div>
+                    <div class="key w1"   data-key="62" title="Down">&#8595;</div>
+                    <div class="key w1"   data-key="63" title="Right">&#8594;</div>
+                  </div>
+                </div>
+                <div class="strip-rail strip-rail-side" id="amb-strip-right"></div>
+              </div>
+              <div class="strip-rail strip-rail-bottom" id="amb-strip-bottom"></div>
+            </div>
+
+            <!-- Numpad module with perimeter strip -->
+            <div id="amb-numpad-module" style="display:none">
+              <div class="strip-wrapper">
+                <div class="strip-rail strip-rail-top" id="amb-np-strip-top"></div>
+                <div class="strip-wrapper-mid">
+                  <div class="strip-rail strip-rail-side" id="amb-np-strip-left"></div>
+                  <div>
+                    <div class="numpad-label">Numpad Module</div>
+                    <div class="keyboard numpad-grid" id="amb-np-layout">
+                      <div class="key" data-np="0"  title="Num Lock">NL</div>
+                      <div class="key" data-np="1"  title="/">/</div>
+                      <div class="key" data-np="2"  title="*">*</div>
+                      <div class="key" data-np="3"  title="-">&#8722;</div>
+                      <div class="key" data-np="4"  title="7">7</div>
+                      <div class="key" data-np="5"  title="8">8</div>
+                      <div class="key" data-np="6"  title="9">9</div>
+                      <div class="key" data-np="7"  title="+">+</div>
+                      <div class="key" data-np="8"  title="4">4</div>
+                      <div class="key" data-np="9"  title="5">5</div>
+                      <div class="key" data-np="10" title="6">6</div>
+                      <div class="key" data-np="11" title="1">1</div>
+                      <div class="key" data-np="12" title="2">2</div>
+                      <div class="key" data-np="13" title="3">3</div>
+                      <div class="key" data-np="14" title="Enter">Ent</div>
+                      <div class="key" data-np="15" title="0">0</div>
+                      <div class="key" data-np="16" title=".">.</div>
+                    </div>
+                  </div>
+                  <div class="strip-rail strip-rail-side" id="amb-np-strip-right"></div>
+                </div>
+                <div class="strip-rail strip-rail-bottom" id="amb-np-strip-bottom"></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="perkey-numpad-toggle">
+          <label class="toggle-label">
+            <input type="checkbox" id="amb-toggle-numpad" />
+            <span>Show Numpad Module</span>
+          </label>
+        </div>
+
+        <div id="amb-status" class="status-msg" style="margin-top:14px"></div>
+      </section>
+
       <!-- PROFILES TAB (commented out)
       <section id="tab-profiles" class="tab">
         ...
       </section>
       -->
 
+
+      <!-- ── SCREEN AMBIENCE TAB ────────────────────────────────────────── -->
+      <section id="tab-screen" class="tab">
+        <div class="tab-header">
+          <h2>Screen Ambience</h2>
+          <p class="subtitle">Turn your keyboard into an ambient display that mirrors the colours at the edges of your screen, like Ambilight for your desk.</p>
+        </div>
+
+        <div class="mc-controls">
+          <div class="mc-row">
+            <div id="screen-badge" class="mc-state-badge mc-off">Inactive</div>
+            <button id="btn-screen-toggle" class="btn-primary">Start Screen Ambience</button>
+          </div>
+        </div>
+
+        <div class="controls-grid" style="max-width:760px; margin-top:24px">
+          <div class="control-group">
+            <label class="control-label">Saturation Boost <span id="lbl-screen-sat" class="val-label">1.5</span></label>
+            <input type="range" id="slider-screen-sat" class="slider" min="1" max="3" step="0.1" value="1.5" />
+          </div>
+          <div class="control-group">
+            <label class="control-label">Transition Speed <span id="lbl-screen-smooth" class="val-label">0.97</span></label>
+            <input type="range" id="slider-screen-smooth" class="slider" min="0.9" max="0.995" step="0.005" value="0.97" />
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:16px; margin-top:20px; padding:14px 18px; background:rgba(255,255,255,0.03); border-radius:10px;">
+          <div id="screen-swatch" style="width:48px; height:48px; border-radius:10px; background:#111; border:1px solid rgba(255,255,255,0.08); transition:background 0.3s;"></div>
+          <div>
+            <div class="control-label" style="margin:0">Dominant Colour</div>
+            <div id="screen-hex" style="font-size:13px; color:var(--text-2, #888); margin-top:2px;">#000000</div>
+          </div>
+        </div>
+
+        <div id="screen-status" class="status-msg" style="margin-top:14px"></div>
+      </section>
 
       <!-- ── MINECRAFT TAB ──────────────────────────────────────────────── -->
       <section id="tab-minecraft" class="tab">
