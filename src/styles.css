@@ -116,6 +116,8 @@ body::before {
 .badge-connecting   { background: var(--accent-q); color: var(--accent); }
 .badge-connecting::before { animation: blink 1s ease-in-out infinite; }
 @keyframes blink { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+.badge-update { background: rgba(69,170,242,0.14); color: #45aaf2; border-color: rgba(69,170,242,0.3); }
+.badge-update.ready { background: rgba(52,199,89,0.14); color: var(--green); border-color: rgba(52,199,89,0.3); }
 
 /* ── Shell ───────────────────────────────────────────────────────────────── */
 .app { display: flex; height: 100vh; padding-top: var(--bar-h); position: relative; z-index: 1; }
@@ -215,6 +217,10 @@ body::before {
 .yeti-preview { background: linear-gradient(180deg, #e0f0ff 0%, #a8d8ff 50%, #fff 100%); position: relative; overflow: hidden; }
 .yeti-preview::after { content: ''; position: absolute; inset: 0; background: radial-gradient(2px 2px at 20% 30%, #fff, transparent), radial-gradient(2px 2px at 60% 50%, #fff, transparent), radial-gradient(2px 2px at 80% 20%, #fff, transparent), radial-gradient(2px 2px at 40% 70%, #fff, transparent); animation: yetiAnim 2s ease-in-out infinite; }
 @keyframes yetiAnim { 0%,100% { opacity: 0.5; transform: translateY(-3px); } 50% { opacity: 1; transform: translateY(3px); } }
+.ripple-preview { background: #0a0a14; position: relative; overflow: hidden; }
+.ripple-preview::before, .ripple-preview::after { content: ''; position: absolute; top: 50%; left: 50%; border-radius: 50%; border: 1.5px solid rgba(69,170,242,0.7); transform: translate(-50%,-50%) scale(0); animation: rippleAnim 2.4s ease-out infinite; }
+.ripple-preview::after { animation-delay: 1.2s; }
+@keyframes rippleAnim { 0% { width: 4px; height: 4px; opacity: 1; transform: translate(-50%,-50%) scale(0); } 100% { width: 56px; height: 56px; opacity: 0; transform: translate(-50%,-50%) scale(1); } }
 .custom-preview { background: linear-gradient(135deg, #ff4d6d 0%, #45aaf2 33%, #26de81 66%, #ffdd59 100%); position: relative; }
 .custom-preview::after { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.25), transparent 60%); }
 

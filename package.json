@@ -6,8 +6,8 @@
   "author": "iVector Academy",
   "scripts": {
     "start": "electron .",
-    "rebuild": "npx @electron/rebuild -f -w node-hid",
-    "postinstall": "npx @electron/rebuild -f -w node-hid",
+    "rebuild": "npx @electron/rebuild -f -w node-hid -w uiohook-napi",
+    "postinstall": "npx @electron/rebuild -f -w node-hid -w uiohook-napi",
     "dist": "electron-builder --mac --arm64",
     "dist:win": "electron-builder --win",
     "pack": "electron-builder --dir"
@@ -26,6 +26,7 @@
     "asarUnpack": [
       "node_modules/node-hid/**",
       "node_modules/usb/**",
+      "node_modules/uiohook-napi/**",
       "**/*.node"
     ],
     "mac": {
@@ -48,12 +49,19 @@
       "identity": null
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "MSaaim",
+      "repo": "mergb"
     },
     "dmg": {
       "contents": [
@@ -71,7 +79,9 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "node-hid": "^3.1.0",
+    "uiohook-napi": "^1.5.5",
     "usb": "^2.17.0"
   },
   "devDependencies": {

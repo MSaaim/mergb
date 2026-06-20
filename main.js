@@ -4,9 +4,34 @@ const fs = require('fs');
 const { MountainKeyboard } = require('./src/keyboard');
 const { MinecraftWatcher } = require('./src/minecraft');
 const { usb } = require('usb');
+const { uIOhook } = require('uiohook-napi');
+const { autoUpdater } = require('electron-updater');
 
 const kb = new MountainKeyboard();
 const mc = new MinecraftWatcher();
+
+// ─── Global keyboard hook for ripple mode ───────────────────────────────────
+let globalKeysActive = false;
+
+function startGlobalKeys() {
+  if (globalKeysActive) return;
+  globalKeysActive = true;
+  uIOhook.on('keydown', onGlobalKeyDown);
+  uIOhook.start();
+}
+
+function stopGlobalKeys() {
+  if (!globalKeysActive) return;
+  globalKeysActive = false;
+  uIOhook.stop();
+  uIOhook.removeListener('keydown', onGlobalKeyDown);
+}
+
+function onGlobalKeyDown(e) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('global:keydown', e.keycode);
+  }
+}
 
 let mainWindow = null;
 let tray = null;
@@ -49,6 +74,12 @@ function buildTrayMenu() {
       click: () => applyEffectFromTray(e.id),
     })),
     {
+      label: '  Ripple',
+      type: 'checkbox',
+      checked: currentEffect === 'ripple',
+      click: () => openRippleMode(),
+    },
+    {
       label: '  Custom',
       type: 'checkbox',
       checked: currentEffect === 'custom',
@@ -65,8 +96,11 @@ async function applyEffectFromTray(effect) {
   const p = 0;
   const color1 = saved.color1 || { r: 255, g: 77, b: 109 };
   const color2 = saved.color2 || { r: 0, g: 128, b: 255 };
-  const speed = saved.speed ?? 128;
-  const brightness = saved.brightness ?? 255;
+  const rawSpd = saved.speed ?? 5;
+  const rawBrt = saved.brightness ?? 10;
+  // Convert 1-10 levels to firmware 0-255 range
+  const speed = Math.round(10 + (Math.max(1, Math.min(10, rawSpd)) - 1) * 245 / 9);
+  const brightness = Math.round(25 + (Math.max(1, Math.min(10, rawBrt)) - 1) * 230 / 9);
   const colorMode = saved.colorMode || 'rainbow';
   const direction = saved.direction || 'right';
 
@@ -90,6 +124,22 @@ async function applyEffectFromTray(effect) {
     }
   } catch (e) {
     console.log('[Tray] Effect error:', e.message);
+  }
+}
+
+function openRippleMode() {
+  showWindow();
+  currentEffect = 'ripple';
+  updateTrayMenu();
+  const send = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('tray:effect-changed', 'ripple');
+    }
+  };
+  if (mainWindow && mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', send);
+  } else {
+    send();
   }
 }
 
@@ -187,6 +237,28 @@ app.whenReady().then(() => {
   createTray();
   createWindow();
   startUsbWatcher();
+
+  // Silent auto-update (Windows only) — download in background, install on quit
+  if (process.platform === 'win32') {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.logger = null;
+
+    const sendUpdate = (status, detail) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update:status', { status, detail });
+      }
+    };
+
+    autoUpdater.on('checking-for-update', () => sendUpdate('checking'));
+    autoUpdater.on('update-available', (info) => sendUpdate('downloading', info.version));
+    autoUpdater.on('download-progress', (p) => sendUpdate('progress', Math.round(p.percent)));
+    autoUpdater.on('update-downloaded', (info) => sendUpdate('ready', info.version));
+    autoUpdater.on('update-not-available', () => sendUpdate('up-to-date'));
+    autoUpdater.on('error', () => sendUpdate('error'));
+
+    setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 10000);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -194,7 +266,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => { isQuitting = true; });
-app.on('will-quit', () => kb.disconnect());
+app.on('will-quit', () => { stopGlobalKeys(); kb.disconnect(); });
 
 // ─── Persistent lighting state ────────────────────────────────────────────────
 const stateFile = path.join(app.getPath('userData'), 'lighting-state.json');
@@ -388,6 +460,9 @@ ipcMain.handle('kb:resume-keepalive', () => {
   kb._startKeepalive();
   return { ok: true };
 });
+
+ipcMain.handle('kb:start-global-keys', () => { startGlobalKeys(); return { ok: true }; });
+ipcMain.handle('kb:stop-global-keys',  () => { stopGlobalKeys();  return { ok: true }; });
 
 ipcMain.handle('kb:light-only', async (_, { indices, r, g, b }) => {
   try { await kb.lightOnly(indices, r ?? 255, g ?? 0, b ?? 0); return { ok: true }; }

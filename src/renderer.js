@@ -15,8 +15,8 @@ const state = {
   activeEffect: 'static',
   colorMode:    'rainbow',
   direction:    'right',
-  speed:        128,
-  brightness:   255,
+  speed:        5,
+  brightness:   10,
   color1:       { r: 255, g: 77, b: 109 },
   color2:       { r: 0,   g: 128, b: 255 },
   // per-key colours (64 main keys + 17 numpad keys)
@@ -29,6 +29,7 @@ const state = {
   brushColor:   { r: 255, g: 255, b: 255 },
   painting:     false,
   ambColor:     { r: 255, g: 255, b: 255 },
+  rippleSmoothing: 5,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -39,6 +40,12 @@ function hexToRgb(hex) {
 function rgbToHex({ r, g, b }) {
   return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }
+
+// Map a 1-10 level to an arbitrary range
+function lvl(level, min, max) { return min + (level - 1) * (max - min) / 9; }
+// Firmware helpers (1-10 → 0-255 range used by HID protocol)
+function fwSpeed(level)      { return Math.round(lvl(level, 10, 255)); }
+function fwBrightness(level) { return Math.round(lvl(level, 25, 255)); }
 
 function setStatus(elId, msg, type = '') {
   const el = document.getElementById(elId);
@@ -264,9 +271,12 @@ window.kb.onTrayEffectChanged((effect) => {
   if (card) card.classList.add('active');
   showEffectControls(effect);
   if (effect !== 'custom' && _stripAnimId) stopStripAnim();
+  if (effect !== 'ripple' && _rippleAnimId) stopRippleAnim();
   if (effect === 'custom') {
     prefillCustomFromLastEffect();
     scheduleCustomApply(100);
+  } else if (effect === 'ripple') {
+    startRippleAnim();
   }
   updateCurrentLighting(effect, state.color1);
 });
@@ -293,6 +303,7 @@ const effectControls = {
   tornado:   { color1: true,  color2: true,  colormode: true,  direction: true,  speed: true,  brightness: true  },
   matrix:    { color1: true,  color2: true,  colormode: false, direction: false, speed: true,  brightness: true  },
   yeti:      { color1: true,  color2: true,  colormode: false, direction: false, speed: true,  brightness: true  },
+  ripple:    { color1: true,  color2: true,  colormode: true,  direction: false, speed: true,  brightness: true, smoothing: true },
   custom:    { color1: false, color2: false, colormode: false, direction: false, speed: false, brightness: false },
   off:       { color1: false, color2: false, colormode: false, direction: false, speed: false, brightness: false },
 };
@@ -306,8 +317,9 @@ function showEffectControls(effect) {
   document.getElementById('group-direction').classList.toggle('hidden', !cfg.direction);
   document.getElementById('group-speed').classList.toggle('hidden',     !cfg.speed);
   document.getElementById('group-brightness').classList.toggle('hidden',!cfg.brightness);
-  // Wave & Tornado: color visibility depends on selected colour mode
-  if (effect === 'wave' || effect === 'tornado') {
+  document.getElementById('group-smoothing').classList.toggle('hidden', !cfg.smoothing);
+  // Wave, Tornado & Ripple: color visibility depends on selected colour mode
+  if (effect === 'wave' || effect === 'tornado' || effect === 'ripple') {
     document.getElementById('group-color1').classList.toggle('hidden', state.colorMode === 'rainbow');
     document.getElementById('group-color2').classList.toggle('hidden', state.colorMode !== 'dual');
   }
@@ -324,9 +336,12 @@ document.querySelectorAll('.effect-card').forEach(card => {
     state.activeEffect = card.dataset.effect;
     showEffectControls(state.activeEffect);
     if (state.activeEffect !== 'custom' && _stripAnimId) stopStripAnim();
+    if (state.activeEffect !== 'ripple' && _rippleAnimId) stopRippleAnim();
     if (state.activeEffect === 'custom') {
       prefillCustomFromLastEffect();
       scheduleCustomApply(100);
+    } else if (state.activeEffect === 'ripple') {
+      startRippleAnim();
     } else {
       scheduleApply(100);
     }
@@ -372,7 +387,7 @@ wireSegGroup('colormode-seg', 'colorMode');
 // When colour mode changes on wave/tornado, update which colour inputs are visible
 document.querySelectorAll('#colormode-seg .seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (state.activeEffect === 'wave' || state.activeEffect === 'tornado') {
+    if (state.activeEffect === 'wave' || state.activeEffect === 'tornado' || state.activeEffect === 'ripple') {
       document.getElementById('group-color1').classList.toggle('hidden', state.colorMode === 'rainbow');
       document.getElementById('group-color2').classList.toggle('hidden', state.colorMode !== 'dual');
     }
@@ -406,6 +421,12 @@ sliderBrightness.addEventListener('input', () => {
   scheduleApply(400);
 });
 
+const sliderSmoothing = document.getElementById('slider-smoothing');
+sliderSmoothing.addEventListener('input', () => {
+  state.rippleSmoothing = parseInt(sliderSmoothing.value);
+  document.getElementById('lbl-smoothing').textContent = state.rippleSmoothing;
+});
+
 // ── Current lighting indicator ────────────────────────────────────────────
 function updateCurrentLighting(effectName, color) {
   const nameEl = document.getElementById('current-effect-name');
@@ -431,7 +452,7 @@ let _applyTimer = null;
 function scheduleApply(delay = 400) {
   clearTimeout(_applyTimer);
   _applyTimer = setTimeout(() => {
-    if (state.connected && state.activeEffect !== 'custom') applyEffect();
+    if (state.connected && state.activeEffect !== 'custom' && state.activeEffect !== 'ripple') applyEffect();
   }, delay);
 }
 
@@ -500,8 +521,8 @@ function applyModeToUI(mode) {
   state.activeEffect = mode.effect;
   if (mode.color1 && (mode.color1.r || mode.color1.g || mode.color1.b)) state.color1 = mode.color1;
   if (mode.color2) state.color2 = mode.color2;
-  if (mode.speed !== undefined) state.speed = mode.speed;
-  if (mode.brightness !== undefined) state.brightness = mode.brightness;
+  if (mode.speed !== undefined) state.speed = Math.max(1, Math.min(10, mode.speed));
+  if (mode.brightness !== undefined) state.brightness = Math.max(1, Math.min(10, mode.brightness));
   if (mode.colorMode) state.colorMode = mode.colorMode;
   if (mode.direction) state.direction = mode.direction;
 
@@ -526,6 +547,11 @@ function applyModeToUI(mode) {
     b.classList.toggle('active', b.dataset.val === state.colorMode));
   document.querySelectorAll('#dir-seg .seg-btn, #dir-seg-rot .seg-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.val === state.direction));
+
+  // Ripple smoothing
+  if (mode.rippleSmoothing !== undefined) state.rippleSmoothing = mode.rippleSmoothing;
+  document.getElementById('slider-smoothing').value = state.rippleSmoothing;
+  document.getElementById('lbl-smoothing').textContent = state.rippleSmoothing;
 
   // Current indicator
   updateCurrentLighting(state.activeEffect, state.color1);
@@ -563,6 +589,8 @@ function applyModeToUI(mode) {
     } else {
       scheduleCustomApply(100);
     }
+  } else if (state.activeEffect === 'ripple') {
+    startRippleAnim();
   } else {
     prefillCustomFromLastEffect();
   }
@@ -579,6 +607,7 @@ function saveLightingState() {
     colorMode: state.colorMode,
     direction: state.direction,
     ambColor: { ...state.ambColor },
+    rippleSmoothing: state.rippleSmoothing,
   };
   if (state.activeEffect === 'custom') {
     s.keyColors = state.keyColors.map(c => ({ ...c }));
@@ -606,7 +635,9 @@ async function applyEffect() {
   setStatus('lighting-status', '');
 
   const p = state.activeProfile;
-  const { speed, brightness, color1, color2, direction, colorMode } = state;
+  const { color1, color2, direction, colorMode } = state;
+  const speed = fwSpeed(state.speed);
+  const brightness = fwBrightness(state.brightness);
   let res;
 
   switch (state.activeEffect) {
@@ -940,6 +971,184 @@ function startStripAnim() {
   _stripAnimId = requestAnimationFrame(frame);
 }
 
+// ── Ripple animation ─────────────────────────────────────────────────────
+// Keypress-triggered: each key press spawns a single expanding ring from
+// that key's position. Multiple presses create overlapping ripples.
+let _rippleAnimId = null;
+const _ripples = [];       // active ripples: { x, y, birth, idx }
+let _rippleIdx = 0;        // colour-cycling counter
+
+// Key positions (col, row) for all 64 keys, matching the physical layout
+const _rkp = [
+  [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],
+  [0,1],[1,1],[2,1],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[9,1],[10,1],[11,1],[12,1],[13,1],
+  [0,2],[1,2],[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],
+  [13,2],
+  [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[13,3],
+  [0,4],[1,4],[2,4],[5,4],[8,4],[9,4],[11,4],[12,4],[13,4],
+];
+// Strip LED positions around the keyboard perimeter (14 wide × 5 tall)
+const _rsp = [];
+{
+  const d = distributeRing(MAIN_SIDE_COUNT, { wide: true });
+  for (let j = 0; j < d.top; j++)    _rsp.push([j * 13 / Math.max(1, d.top - 1), -0.5]);
+  for (let j = 0; j < d.right; j++)  _rsp.push([13.5, j * 4 / Math.max(1, d.right - 1)]);
+  for (let j = 0; j < d.bottom; j++) _rsp.push([13 - j * 13 / Math.max(1, d.bottom - 1), 4.5]);
+  for (let j = 0; j < d.left; j++)   _rsp.push([-0.5, 4 - j * 4 / Math.max(1, d.left - 1)]);
+}
+// Numpad strip positions (offset to the right of main keyboard)
+const _rnp = [];
+{
+  const d = distributeRing(NUMPAD_SIDE_COUNT, { wide: false });
+  for (let j = 0; j < d.top; j++)    _rnp.push([15.5 + j * 3.5 / Math.max(1, d.top - 1), -0.5]);
+  for (let j = 0; j < d.right; j++)  _rnp.push([19.5, j * 4 / Math.max(1, d.right - 1)]);
+  for (let j = 0; j < d.bottom; j++) _rnp.push([19 - j * 3.5 / Math.max(1, d.bottom - 1), 4.5]);
+  for (let j = 0; j < d.left; j++)   _rnp.push([15, 4 - j * 4 / Math.max(1, d.left - 1)]);
+}
+
+// Map uiohook scan code → key index (0-63)
+const _rippleKeyMap = {
+  0x01:0,  // Esc
+  0x02:1,0x03:2,0x04:3,0x05:4,0x06:5,0x07:6,0x08:7,0x09:8,0x0A:9,0x0B:10,
+  0x0C:11,0x0D:12,0x0E:13,  // - = Bksp
+  0x0F:14, // Tab
+  0x10:15,0x11:16,0x12:17,0x13:18,0x14:19,0x15:20,0x16:21,0x17:22,0x18:23,0x19:24, // Q-P
+  0x1A:25,0x1B:26,  // [ ]
+  0x1C:40, // Enter
+  0x1D:55, // LCtrl
+  0x1E:29,0x1F:30,0x20:31,0x21:32,0x22:33,0x23:34,0x24:35,0x25:36,0x26:37, // A-L
+  0x27:38,0x28:39,  // ; '
+  0x2A:41, // LShift
+  0x2B:27, // backslash
+  0x2C:42,0x2D:43,0x2E:44,0x2F:45,0x30:46,0x31:47,0x32:48, // Z-M
+  0x33:49,0x34:50,0x35:51, // , . /
+  0x36:52, // RShift
+  0x38:57, // LAlt
+  0x39:58, // Space
+  0x3A:28, // CapsLock
+  // Extended keys
+  0xE048:53, // ArrowUp
+  0xE050:62, // ArrowDown
+  0xE04B:61, // ArrowLeft
+  0xE04D:63, // ArrowRight
+  0xE053:54, // Delete
+  0xE05B:56, // Meta/Cmd/Win
+  0xE038:59, // AltRight
+};
+
+function _spawnRipple(keycode) {
+  const idx = _rippleKeyMap[keycode];
+  if (idx === undefined) return;
+  const pos = _rkp[idx];
+  _ripples.push({ x: pos[0], y: pos[1], birth: performance.now(), idx: _rippleIdx++ });
+  if (_ripples.length > 24) _ripples.shift();
+}
+
+// Global key listener (works even when window is minimised/unfocused)
+window.kb.onGlobalKey((keycode) => {
+  if (_rippleAnimId) _spawnRipple(keycode);
+});
+
+function stopRippleAnim() {
+  if (!_rippleAnimId) return;
+  cancelAnimationFrame(_rippleAnimId);
+  _rippleAnimId = null;
+  _ripples.length = 0;
+  window.kb.stopGlobalKeys();
+  window.kb.resumeKeepalive();
+}
+
+async function startRippleAnim() {
+  if (_rippleAnimId) return;
+  if (!state.connected) {
+    setStatus('lighting-status', 'Not connected — click Connect first.', 'err');
+    return;
+  }
+
+  if (audioViz.active) await stopAudioViz();
+  if (screenAmb.active) await stopScreenAmb();
+  if (_stripAnimId) stopStripAnim();
+
+  await window.kb.pauseKeepalive();
+  await window.kb.setCustom({
+    colors: Array.from({ length: 64 }, () => ({ r: 0, g: 0, b: 0 })),
+    sideColors: Array.from({ length: MAIN_SIDE_COUNT }, () => ({ r: 0, g: 0, b: 0 })),
+    numpadColors: null, numpadSideColors: null, profile: state.activeProfile,
+  });
+
+  _ripples.length = 0;
+  window.kb.startGlobalKeys();
+
+  let sending = false;
+  const maxRadius = 16;
+
+  function rippleColor(rip) {
+    if (state.colorMode === 'rainbow') return hslToRgb((rip.idx * 30) % 360, 1, 0.5);
+    if (state.colorMode === 'dual') return rip.idx % 2 === 0 ? state.color1 : state.color2;
+    return state.color1;
+  }
+
+  function frame(ts) {
+    if (!_rippleAnimId) return;
+
+    const speedNorm = (state.speed - 1) / 9;                    // 1-10 → 0-1
+    const expansion = 0.004 + speedNorm * 0.016;               // units per ms
+    const sigma = lvl(state.rippleSmoothing, 0.2, 1.5);        // 1-10 → 0.2-1.5
+    const invTwoSigSq = 1 / (2 * sigma * sigma);
+    const bScale = state.brightness / 10;                      // 1-10 → 0.1-1
+
+    // Prune dead ripples
+    for (let i = _ripples.length - 1; i >= 0; i--) {
+      const radius = (ts - _ripples[i].birth) * expansion;
+      if (radius > maxRadius + sigma * 4) _ripples.splice(i, 1);
+    }
+
+    // For a given LED position, compute the brightest ripple contribution
+    function ledValue(lx, ly) {
+      let bestV = 0, bestIdx = 0;
+      for (const rip of _ripples) {
+        const dist = Math.hypot(lx - rip.x, ly - rip.y);
+        const radius = (ts - rip.birth) * expansion;
+        const diff = dist - radius;
+        // Gaussian ring profile — smooth bell curve centred on the wavefront
+        const ring = Math.exp(-(diff * diff) * invTwoSigSq);
+        // Fade out as ring expands: smooth cosine ease
+        const t = Math.min(radius / maxRadius, 1);
+        const fade = (1 + Math.cos(t * Math.PI)) * 0.5;
+        const v = ring * fade;
+        if (v > bestV) { bestV = v; bestIdx = rip.idx; }
+      }
+      return { v: bestV, idx: bestIdx };
+    }
+
+    function toRgb(lx, ly) {
+      const { v, idx } = ledValue(lx, ly);
+      if (v < 0.004) return { r: 0, g: 0, b: 0 };
+      const c = rippleColor({ idx });
+      const b = v * bScale;
+      return { r: Math.round(c.r * b), g: Math.round(c.g * b), b: Math.round(c.b * b) };
+    }
+
+    const keyColors = _rkp.map(p => toRgb(p[0], p[1]));
+    const stripColors = _rsp.map(p => toRgb(p[0], p[1]));
+    let npColors = null;
+    if (state.numpadVisible) npColors = _rnp.map(p => toRgb(p[0], p[1]));
+
+    if (state.connected && !sending) {
+      sending = true;
+      window.kb.sendVizFrame({ colors: keyColors, sideColors: stripColors, numpadSideColors: npColors })
+        .finally(() => { sending = false; });
+    }
+
+    _rippleAnimId = requestAnimationFrame(frame);
+  }
+
+  _rippleAnimId = requestAnimationFrame(frame);
+  updateCurrentLighting('ripple', state.color1);
+  saveLightingState();
+  window.appInfo.setCurrentEffect('ripple');
+}
+
 // ── Ambience tab controls ─────────────────────────────────────────────────
 const ambSwatch = document.getElementById('amb-color');
 const ambHexIn  = document.getElementById('amb-color-hex');
@@ -965,6 +1174,7 @@ document.getElementById('btn-amb-toggle').addEventListener('click', async () => 
     setStatus('amb-status', 'Not connected — click Connect first.', 'err');
     return;
   }
+  if (_rippleAnimId) stopRippleAnim();
   await applyCustomColors();
   paintAmbienceVisual();
   startStripAnim();
@@ -1243,8 +1453,8 @@ const audioViz = {
   analyser: null,
   source: null,
   frameTimer: null,
-  sensitivity: 1.5,
-  smoothing: 0.7,
+  sensitivity: 3,
+  smoothing: 7,
   colorTheme: 'spectrum',
   target: 'both',       // 'both' | 'keys' | 'strip'
   direction: 'bottom-up', // 'bottom-up' | 'top-down' | 'center-out' | 'full-row'
@@ -1268,6 +1478,7 @@ async function startAudioViz() {
     setStatus('viz-status', 'Not connected — click Connect first.', 'err');
     return;
   }
+  if (_rippleAnimId) stopRippleAnim();
 
   // Capture audio input (picks up BlackHole if set as default input,
   // otherwise falls back to microphone)
@@ -1291,7 +1502,7 @@ async function startAudioViz() {
   audioViz.audioCtx = new AudioContext();
   audioViz.analyser = audioViz.audioCtx.createAnalyser();
   audioViz.analyser.fftSize = 256;
-  audioViz.analyser.smoothingTimeConstant = audioViz.smoothing;
+  audioViz.analyser.smoothingTimeConstant = lvl(audioViz.smoothing, 0.1, 0.95);
   audioViz.source = audioViz.audioCtx.createMediaStreamSource(audioViz.stream);
   audioViz.source.connect(audioViz.analyser);
   audioViz.fftData = new Uint8Array(audioViz.analyser.frequencyBinCount);
@@ -1450,7 +1661,7 @@ async function vizFrameRunning() {
   while (audioViz.active) {
     try {
       audioViz.analyser.getByteFrequencyData(audioViz.fftData);
-      const bands = computeBands(audioViz.fftData, audioViz.sensitivity);
+      const bands = computeBands(audioViz.fftData, lvl(audioViz.sensitivity, 0.5, 4.0));
 
       // Update preview bars
       const bars = document.querySelectorAll('.viz-bar');
@@ -1481,14 +1692,14 @@ document.getElementById('btn-viz-toggle').addEventListener('click', () => {
 });
 
 document.getElementById('slider-viz-sens').addEventListener('input', (e) => {
-  audioViz.sensitivity = parseFloat(e.target.value);
-  document.getElementById('lbl-viz-sens').textContent = audioViz.sensitivity.toFixed(1);
+  audioViz.sensitivity = parseInt(e.target.value);
+  document.getElementById('lbl-viz-sens').textContent = audioViz.sensitivity;
 });
 
 document.getElementById('slider-viz-smooth').addEventListener('input', (e) => {
-  audioViz.smoothing = parseFloat(e.target.value);
-  document.getElementById('lbl-viz-smooth').textContent = audioViz.smoothing.toFixed(2);
-  if (audioViz.analyser) audioViz.analyser.smoothingTimeConstant = audioViz.smoothing;
+  audioViz.smoothing = parseInt(e.target.value);
+  document.getElementById('lbl-viz-smooth').textContent = audioViz.smoothing;
+  if (audioViz.analyser) audioViz.analyser.smoothingTimeConstant = lvl(audioViz.smoothing, 0.1, 0.95);
 });
 
 document.querySelectorAll('#viz-theme-seg .seg-btn').forEach(btn => {
@@ -1533,6 +1744,7 @@ origEffectClick.forEach(card => {
 // Stop on disconnect
 window.kb.onAutoDisconnected(() => {
   if (_stripAnimId) stopStripAnim();
+  if (_rippleAnimId) stopRippleAnim();
   if (audioViz.active) stopAudioViz();
   if (screenAmb.active) stopScreenAmb();
 });
@@ -1547,8 +1759,8 @@ const screenAmb = {
   video: null,
   canvas: null,
   ctx: null,
-  saturation: 1.5,
-  smoothing: 0.97,
+  saturation: 3,
+  smoothing: 8,
   currentColor: { r: 0, g: 0, b: 0 },
   sending: false,
 };
@@ -1617,6 +1829,7 @@ async function startScreenAmb() {
     setStatus('screen-status', 'Not connected — click Connect first.', 'err');
     return;
   }
+  if (_rippleAnimId) stopRippleAnim();
 
   let sources;
   try { sources = await window.desktop.getSources(); } catch (_) { sources = []; }
@@ -1693,10 +1906,10 @@ function screenAmbFrame() {
   // Sample dominant screen colour from tiny offscreen canvas
   ctx.drawImage(video, 0, 0, SCR_W, SCR_H);
   const data = ctx.getImageData(0, 0, SCR_W, SCR_H).data;
-  const target = screenDominantColor(data, screenAmb.saturation);
+  const target = screenDominantColor(data, lvl(screenAmb.saturation, 1.0, 3.0));
 
   // Smooth transition toward target
-  const sm = screenAmb.smoothing;
+  const sm = lvl(screenAmb.smoothing, 0.9, 0.995);
   const c = screenAmb.currentColor;
   screenAmb.currentColor = {
     r: Math.round(c.r * sm + target.r * (1 - sm)),
@@ -1733,13 +1946,13 @@ document.getElementById('btn-screen-toggle').addEventListener('click', () => {
 });
 
 document.getElementById('slider-screen-sat').addEventListener('input', (e) => {
-  screenAmb.saturation = parseFloat(e.target.value);
-  document.getElementById('lbl-screen-sat').textContent = screenAmb.saturation.toFixed(1);
+  screenAmb.saturation = parseInt(e.target.value);
+  document.getElementById('lbl-screen-sat').textContent = screenAmb.saturation;
 });
 
 document.getElementById('slider-screen-smooth').addEventListener('input', (e) => {
-  screenAmb.smoothing = parseFloat(e.target.value);
-  document.getElementById('lbl-screen-smooth').textContent = screenAmb.smoothing.toFixed(2);
+  screenAmb.smoothing = parseInt(e.target.value);
+  document.getElementById('lbl-screen-smooth').textContent = screenAmb.smoothing;
 });
 
 // Stop screen ambience when switching to another effect
@@ -1784,6 +1997,30 @@ async function refreshDeviceTab() {
     overlay.style.display = 'none';
   });
 })();
+
+// ── Auto-update indicator ─────────────────────────────────────────────────
+window.appInfo.onUpdateStatus(({ status, detail }) => {
+  const el = document.getElementById('update-badge');
+  switch (status) {
+    case 'downloading':
+      el.textContent = `Updating to v${detail}…`;
+      el.className = 'badge badge-update';
+      el.style.display = '';
+      break;
+    case 'progress':
+      el.textContent = `Downloading… ${detail}%`;
+      break;
+    case 'ready':
+      el.textContent = `v${detail} ready — restart to apply`;
+      el.className = 'badge badge-update ready';
+      break;
+    case 'up-to-date':
+    case 'error':
+    case 'checking':
+      el.style.display = 'none';
+      break;
+  }
+});
 
 // ── Close-to-tray notification ────────────────────────────────────────────
 window.appInfo.onCloseToTray(() => {

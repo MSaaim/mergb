@@ -17,6 +17,7 @@
       MeRGB
     </div>
     <div id="conn-badge" class="badge badge-disconnected">Disconnected</div>
+    <div id="update-badge" class="badge badge-update" style="display:none"></div>
   </div>
 
   <!-- ── App shell ──────────────────────────────────────────────────────────── -->
@@ -135,6 +136,10 @@
             <div class="effect-icon yeti-preview"></div>
             <span>Yeti</span>
           </button>
+          <button class="effect-card" data-effect="ripple">
+            <div class="effect-icon ripple-preview"></div>
+            <span>Ripple</span>
+          </button>
           <button class="effect-card" data-effect="custom">
             <div class="effect-icon custom-preview"></div>
             <span>Custom</span>
@@ -190,14 +195,20 @@
 
           <!-- Speed -->
           <div class="control-group hidden" id="group-speed">
-            <label class="control-label">Speed <span id="lbl-speed" class="val-label">128</span></label>
-            <input type="range" id="slider-speed" class="slider" min="10" max="255" value="128" />
+            <label class="control-label">Speed <span id="lbl-speed" class="val-label">5</span></label>
+            <input type="range" id="slider-speed" class="slider" min="1" max="10" value="5" />
           </div>
 
           <!-- Brightness -->
           <div class="control-group" id="group-brightness">
-            <label class="control-label">Brightness <span id="lbl-brightness" class="val-label">255</span></label>
-            <input type="range" id="slider-brightness" class="slider" min="0" max="255" value="255" />
+            <label class="control-label">Brightness <span id="lbl-brightness" class="val-label">10</span></label>
+            <input type="range" id="slider-brightness" class="slider" min="1" max="10" value="10" />
+          </div>
+
+          <!-- Smoothing (ripple only) -->
+          <div class="control-group hidden" id="group-smoothing">
+            <label class="control-label">Smoothing <span id="lbl-smoothing" class="val-label">5</span></label>
+            <input type="range" id="slider-smoothing" class="slider" min="1" max="10" value="5" />
           </div>
 
         </div>
@@ -556,12 +567,12 @@
 
         <div class="controls-grid" style="max-width:760px; margin-top:24px">
           <div class="control-group">
-            <label class="control-label">Saturation Boost <span id="lbl-screen-sat" class="val-label">1.5</span></label>
-            <input type="range" id="slider-screen-sat" class="slider" min="1" max="3" step="0.1" value="1.5" />
+            <label class="control-label">Saturation Boost <span id="lbl-screen-sat" class="val-label">3</span></label>
+            <input type="range" id="slider-screen-sat" class="slider" min="1" max="10" value="3" />
           </div>
           <div class="control-group">
-            <label class="control-label">Transition Speed <span id="lbl-screen-smooth" class="val-label">0.97</span></label>
-            <input type="range" id="slider-screen-smooth" class="slider" min="0.9" max="0.995" step="0.005" value="0.97" />
+            <label class="control-label">Transition Speed <span id="lbl-screen-smooth" class="val-label">8</span></label>
+            <input type="range" id="slider-screen-smooth" class="slider" min="1" max="10" value="8" />
           </div>
         </div>
 
@@ -650,8 +661,8 @@
 
         <div class="controls-grid" style="max-width:760px; margin-top:24px">
           <div class="control-group">
-            <label class="control-label">Sensitivity <span id="lbl-viz-sens" class="val-label">1.5</span></label>
-            <input type="range" id="slider-viz-sens" class="slider" min="0.5" max="4" step="0.1" value="1.5" />
+            <label class="control-label">Sensitivity <span id="lbl-viz-sens" class="val-label">3</span></label>
+            <input type="range" id="slider-viz-sens" class="slider" min="1" max="10" value="3" />
           </div>
           <div class="control-group">
             <label class="control-label">Colour Theme</label>
@@ -663,8 +674,8 @@
             </div>
           </div>
           <div class="control-group">
-            <label class="control-label">Smoothing <span id="lbl-viz-smooth" class="val-label">0.7</span></label>
-            <input type="range" id="slider-viz-smooth" class="slider" min="0.1" max="0.95" step="0.05" value="0.7" />
+            <label class="control-label">Smoothing <span id="lbl-viz-smooth" class="val-label">7</span></label>
+            <input type="range" id="slider-viz-smooth" class="slider" min="1" max="10" value="7" />
           </div>
 
           <div class="control-group">

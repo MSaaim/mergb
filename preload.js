@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('kb', {
   onAutoConnected:    (cb) => { ipcRenderer.on('kb:auto-connected', (_, d) => cb(d)); },
   onAutoDisconnected: (cb) => { ipcRenderer.on('kb:auto-disconnected', () => cb()); },
   onTrayEffectChanged: (cb) => { ipcRenderer.on('tray:effect-changed', (_, effect) => cb(effect)); },
+  startGlobalKeys: () => ipcRenderer.invoke('kb:start-global-keys'),
+  stopGlobalKeys:  () => ipcRenderer.invoke('kb:stop-global-keys'),
+  onGlobalKey:     (cb) => { ipcRenderer.on('global:keydown', (_, keycode) => cb(keycode)); },
 });
 
 contextBridge.exposeInMainWorld('desktop', {
@@ -38,6 +41,7 @@ contextBridge.exposeInMainWorld('appInfo', {
   setCurrentEffect: (e) => ipcRenderer.invoke('app:set-current-effect', e),
   hideToTray: () => ipcRenderer.invoke('app:hide-to-tray'),
   onCloseToTray: (cb) => { ipcRenderer.on('app:close-to-tray', () => cb()); },
+  onUpdateStatus: (cb) => { ipcRenderer.on('update:status', (_, d) => cb(d)); },
 });
 
 contextBridge.exposeInMainWorld('mc', {
