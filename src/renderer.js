@@ -1288,10 +1288,46 @@ loadPresets();
 // ── Minecraft Mode ────────────────────────────────────────────────────────
 const mcState = {
   active: false,
+  customReady: false,   // true after initial setCustom activates CUSTOM mode
   dimension: 'overworld',
   flashTimeout: null,
   log: [],
 };
+
+// Gaming keys that get the contrast/highlight color (data-key indices)
+// W=16, A=29, S=30, D=31, 1=1, 2=2, 3=3, 4=4, LShift=41, LCtrl=55, Space=58
+const MC_GAMING_KEYS = new Set([16, 29, 30, 31, 1, 2, 3, 4, 41, 55, 58]);
+const MC_TOTAL_KEYS  = 64;
+
+// Dimension color palettes: { base: rest of keyboard, highlight: gaming keys }
+const MC_DIM_COLORS = {
+  overworld: { base: {r:0,  g:160, b:60 }, highlight: {r:160,g:0,   b:255} },
+  nether:    { base: {r:255,g:80,  b:0  }, highlight: {r:0,  g:180, b:255} },
+  end:       { base: {r:160,g:0,   b:255}, highlight: {r:255,g:200, b:0  } },
+};
+
+function mcBuildColors(base, highlight) {
+  const colors = [];
+  for (let i = 0; i < MC_TOTAL_KEYS; i++) {
+    colors.push(MC_GAMING_KEYS.has(i) ? { ...highlight } : { ...base });
+  }
+  return colors;
+}
+
+function mcBuildSideColors(base) {
+  return Array.from({ length: MAIN_SIDE_COUNT }, () => ({ ...base }));
+}
+
+// Send a per-key + strip frame. First call uses setCustom to activate CUSTOM
+// mode, subsequent calls use sendVizFrame for instant updates.
+async function mcSendFrame(colors, sideColors) {
+  if (!mcState.customReady) {
+    await window.kb.setCustom({ colors, sideColors });
+    mcState.customReady = true;
+  } else {
+    await window.kb.sendVizFrame({ colors, sideColors });
+  }
+}
 
 const btnMcToggle = document.getElementById('btn-mc-toggle');
 const mcBadge     = document.getElementById('mc-badge');
@@ -1305,6 +1341,7 @@ btnMcToggle.addEventListener('click', async () => {
   if (mcState.active) {
     await window.mc.stop();
     mcState.active = false;
+    mcState.customReady = false;
     mcBadge.textContent = 'Inactive';
     mcBadge.className = 'mc-state-badge mc-off';
     btnMcToggle.textContent = 'Start Minecraft Mode';
@@ -1336,26 +1373,19 @@ function mcUpdateDimUI(dim) {
 function mcApplyDimension(dim) {
   if (!mcState.active || !state.connected) return;
   mcState.dimension = dim;
-  switch (dim) {
-    case 'nether':
-      window.kb.setBreathing({ color1: {r:255,g:80,b:0}, color2: {r:60,g:10,b:0}, speed: 160, brightness: 255 });
-      updateCurrentLighting('breathing', {r:255,g:80,b:0});
-      break;
-    case 'end':
-      window.kb.setBreathing({ color1: {r:160,g:0,b:255}, color2: {r:30,g:0,b:60}, speed: 120, brightness: 255 });
-      updateCurrentLighting('breathing', {r:160,g:0,b:255});
-      break;
-    default:
-      window.kb.setStatic({ r: 0, g: 160, b: 60 });
-      updateCurrentLighting('static', {r:0,g:160,b:60});
-      break;
-  }
+  const palette = MC_DIM_COLORS[dim] || MC_DIM_COLORS.overworld;
+  const colors = mcBuildColors(palette.base, palette.highlight);
+  const side = mcBuildSideColors(palette.base);
+  mcSendFrame(colors, side);
+  updateCurrentLighting('custom', palette.base);
 }
 
 function mcFlash(r, g, b, ms) {
   if (!state.connected) return;
   if (mcState.flashTimeout) clearTimeout(mcState.flashTimeout);
-  window.kb.setStatic({ r, g, b });
+  const colors = mcBuildColors({r,g,b}, {r,g,b});
+  const side = mcBuildSideColors({r,g,b});
+  mcSendFrame(colors, side);
   mcState.flashTimeout = setTimeout(() => {
     mcState.flashTimeout = null;
     mcApplyDimension(mcState.dimension);
@@ -1393,14 +1423,7 @@ window.mc.onEvent((data) => {
     case 'dimension': {
       mcLogEvent('dimension', 'Entered ' + data.dimension);
       mcUpdateDimUI(data.dimension);
-      const dim = data.dimension;
-      const flashColor = dim === 'nether' ? [255,100,0] : dim === 'end' ? [160,0,255] : [0,200,80];
-      if (mcState.flashTimeout) clearTimeout(mcState.flashTimeout);
-      window.kb.setStatic({ r: flashColor[0], g: flashColor[1], b: flashColor[2] });
-      mcState.flashTimeout = setTimeout(() => {
-        mcState.flashTimeout = null;
-        mcApplyDimension(dim);
-      }, 400);
+      mcApplyDimension(data.dimension);
       break;
     }
   }

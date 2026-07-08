@@ -116,13 +116,15 @@ class MinecraftWatcher extends EventEmitter {
       return;
     }
 
-    // Dimension changes (logged when world loads)
-    if (/the_nether/i.test(line) && /dimension/i.test(line)) {
-      this.emit('event', { type: 'dimension', dimension: 'nether' });
-    } else if (/the_end/i.test(line) && /dimension/i.test(line)) {
-      this.emit('event', { type: 'dimension', dimension: 'end' });
-    } else if (/overworld/i.test(line) && /dimension/i.test(line)) {
-      this.emit('event', { type: 'dimension', dimension: 'overworld' });
+    // Dimension changes — match "Creating pipeline for dimension minecraft:X"
+    // Avoid the "Reloading pipeline on dimension change: A => B" line which
+    // contains both the old and new dimension names.
+    const dimMatch = line.match(/Creating pipeline for dimension minecraft:(\S+)/i);
+    if (dimMatch) {
+      const d = dimMatch[1];
+      if (/the_nether/i.test(d))       this.emit('event', { type: 'dimension', dimension: 'nether' });
+      else if (/the_end/i.test(d))     this.emit('event', { type: 'dimension', dimension: 'end' });
+      else if (/overworld/i.test(d))   this.emit('event', { type: 'dimension', dimension: 'overworld' });
     }
   }
 
