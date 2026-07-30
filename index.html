@@ -232,6 +232,19 @@
             <button class="btn-secondary" id="btn-clear-strip">Clear Strip</button>
           </div>
 
+          <!-- Built-in patterns & animations -->
+          <div class="builtin-patterns">
+            <div class="builtin-row">
+              <span class="control-label builtin-label">Patterns</span>
+              <button class="btn-secondary pattern-btn" data-pattern="heart" title="Heart shape on keys">&#9829; Heart</button>
+            </div>
+            <div class="builtin-row">
+              <span class="control-label builtin-label">Animations</span>
+              <button class="btn-secondary anim-btn" data-anim="shapes" title="Morphing shapes with colour transitions">Shapes</button>
+              <button class="btn-secondary anim-btn" data-anim="plasma" title="Organic flowing colour field">Plasma</button>
+            </div>
+          </div>
+
           <div class="keyboard-wrap">
             <div class="kb-modules">
 
@@ -398,10 +411,30 @@
           <label class="control-label" style="margin:0">Animation Colour</label>
           <input type="color" id="amb-color" value="#ffffff" class="color-swatch" />
           <input type="text" id="amb-color-hex" value="#ffffff" class="hex-input" maxlength="7" spellcheck="false" />
+          <label class="control-label" style="margin:0 0 0 10px">Pattern</label>
+          <div class="segment-group" id="amb-style-seg">
+            <button class="seg-btn active" data-val="split">Split</button>
+            <button class="seg-btn" data-val="circle">Circle</button>
+          </div>
+          <label class="control-label hidden" id="amb-dir-label" style="margin:0 0 0 10px">Direction</label>
+          <div class="segment-group hidden" id="amb-dir-seg">
+            <button class="seg-btn active" data-val="cw">CW</button>
+            <button class="seg-btn" data-val="ccw">CCW</button>
+          </div>
           <div style="flex:1"></div>
           <button class="btn-primary" id="btn-amb-toggle">Start Animation</button>
         </div>
 
+        <div class="controls-grid" style="max-width:760px; margin-top:-6px">
+          <div class="control-group">
+            <label class="control-label">Speed <span id="lbl-amb-speed" class="val-label">5</span></label>
+            <input type="range" id="slider-amb-speed" class="slider" min="1" max="10" value="5" />
+          </div>
+          <div class="control-group">
+            <label class="control-label">Smoothing <span id="lbl-amb-smoothing" class="val-label">5</span></label>
+            <input type="range" id="slider-amb-smoothing" class="slider" min="1" max="10" value="5" />
+          </div>
+        </div>
 
         <div class="keyboard-wrap">
           <div class="kb-modules">

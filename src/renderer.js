@@ -29,6 +29,10 @@ const state = {
   brushColor:   { r: 255, g: 255, b: 255 },
   painting:     false,
   ambColor:     { r: 255, g: 255, b: 255 },
+  ambStyle:     'split',
+  ambDirection: 'cw',
+  ambSpeed:     5,
+  ambSmoothing: 5,
   rippleSmoothing: 5,
 };
 
@@ -271,6 +275,7 @@ window.kb.onTrayEffectChanged((effect) => {
   if (card) card.classList.add('active');
   showEffectControls(effect);
   if (effect !== 'custom' && _stripAnimId) stopStripAnim();
+  if (effect !== 'custom' && _keyAnimId) stopKeyAnim();
   if (effect !== 'ripple' && _rippleAnimId) stopRippleAnim();
   if (effect === 'custom') {
     prefillCustomFromLastEffect();
@@ -336,6 +341,7 @@ document.querySelectorAll('.effect-card').forEach(card => {
     state.activeEffect = card.dataset.effect;
     showEffectControls(state.activeEffect);
     if (state.activeEffect !== 'custom' && _stripAnimId) stopStripAnim();
+    if (state.activeEffect !== 'custom' && _keyAnimId) stopKeyAnim();
     if (state.activeEffect !== 'ripple' && _rippleAnimId) stopRippleAnim();
     if (state.activeEffect === 'custom') {
       prefillCustomFromLastEffect();
@@ -562,6 +568,27 @@ function applyModeToUI(mode) {
     document.getElementById('amb-color').value = rgbToHex(state.ambColor);
     document.getElementById('amb-color-hex').value = rgbToHex(state.ambColor);
   }
+  if (mode.ambStyle) {
+    state.ambStyle = mode.ambStyle;
+    document.querySelectorAll('#amb-style-seg .seg-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.val === state.ambStyle));
+    syncAmbDirVisibility();
+  }
+  if (mode.ambDirection) {
+    state.ambDirection = mode.ambDirection;
+    document.querySelectorAll('#amb-dir-seg .seg-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.val === state.ambDirection));
+  }
+  if (mode.ambSpeed !== undefined) {
+    state.ambSpeed = mode.ambSpeed;
+    document.getElementById('slider-amb-speed').value = state.ambSpeed;
+    document.getElementById('lbl-amb-speed').textContent = state.ambSpeed;
+  }
+  if (mode.ambSmoothing !== undefined) {
+    state.ambSmoothing = mode.ambSmoothing;
+    document.getElementById('slider-amb-smoothing').value = state.ambSmoothing;
+    document.getElementById('lbl-amb-smoothing').textContent = state.ambSmoothing;
+  }
 
   // Restore custom per-key data if saved
   if (state.activeEffect === 'custom') {
@@ -607,6 +634,10 @@ function saveLightingState() {
     colorMode: state.colorMode,
     direction: state.direction,
     ambColor: { ...state.ambColor },
+    ambStyle: state.ambStyle,
+    ambDirection: state.ambDirection,
+    ambSpeed: state.ambSpeed,
+    ambSmoothing: state.ambSmoothing,
     rippleSmoothing: state.rippleSmoothing,
   };
   if (state.activeEffect === 'custom') {
@@ -900,6 +931,7 @@ function startStripAnim() {
   const mainGlow = Array.from({ length: MAIN_SIDE_COUNT }, () => 0);
   const npGlow   = Array.from({ length: NUMPAD_SIDE_COUNT }, () => 0);
   let lastTs = null;
+  let animTime = 0;
   let sending = false;
 
   document.getElementById('btn-amb-toggle').textContent = 'Stop Animation';
@@ -909,18 +941,15 @@ function startStripAnim() {
     if (!lastTs) lastTs = ts;
     const dt = Math.min(ts - lastTs, 50);
     lastTs = ts;
+    animTime += dt;
 
     const rgb = state.ambColor;
-    const speed = 0.02 + (10 - 5) * (0.12 / 95);
-    const decayPerMs = 0.5 - (100 / 100) * 0.47;
+    const speed = lvl(state.ambSpeed, 0.005, 0.028);
+    const decayPerMs = lvl(state.ambSmoothing, 0.65, 0.95);
     const decay = Math.pow(decayPerMs, dt / 16.67);
 
     const tailMain = Math.round(2 + (100 / 100) * 8);
     const tailNp   = Math.max(1, Math.round(tailMain * 0.5));
-
-    const elapsed = ts;
-    const mainPos = (elapsed * speed) % (mainMaxLen + tailMain);
-    const npPos   = mainPos * npScale;
 
     for (let i = 0; i < mainGlow.length; i++) mainGlow[i] *= decay;
     for (let i = 0; i < npGlow.length; i++)   npGlow[i] *= decay;
@@ -936,8 +965,27 @@ function startStripAnim() {
       }
     }
 
-    stampTrail(mainPaths, mainGlow, mainPos, tailMain);
-    if (state.numpadVisible) stampTrail(numpadPaths, npGlow, npPos, tailNp);
+    // Single dot looping continuously around the ring (indices are already in
+    // physical perimeter order, so wrapping the index walks the whole loop).
+    function stampCircleTrail(glow, pos, tail, total) {
+      for (let t = 0; t < tail; t++) {
+        const idx = ((Math.floor(pos) - t) % total + total) % total;
+        const brightness = 1 - (t / tail);
+        glow[idx] = Math.max(glow[idx], brightness);
+      }
+    }
+
+    if (state.ambStyle === 'circle') {
+      const dirSign = state.ambDirection === 'ccw' ? -1 : 1;
+      const frac = dirSign * (animTime * speed / mainMaxLen) % 1;
+      stampCircleTrail(mainGlow, frac * MAIN_SIDE_COUNT, tailMain, MAIN_SIDE_COUNT);
+      if (state.numpadVisible) stampCircleTrail(npGlow, frac * NUMPAD_SIDE_COUNT, tailNp, NUMPAD_SIDE_COUNT);
+    } else {
+      const mainPos = (animTime * speed) % (mainMaxLen + tailMain);
+      const npPos   = mainPos * npScale;
+      stampTrail(mainPaths, mainGlow, mainPos, tailMain);
+      if (state.numpadVisible) stampTrail(numpadPaths, npGlow, npPos, tailNp);
+    }
 
     const mainColors = mainGlow.map(g => ({
       r: Math.round(rgb.r * g), g: Math.round(rgb.g * g), b: Math.round(rgb.b * g),
@@ -970,6 +1018,241 @@ function startStripAnim() {
 
   _stripAnimId = requestAnimationFrame(frame);
 }
+
+// ── Built-in patterns & animations ───────────────────────────────────────
+// Heart shape mapped onto the 14-col × 5-row key grid (data-key indices).
+//   Row 0:  . . X X X . . X X X . . . .
+//   Row 1:  . X X X X X X X X X X . . .
+//   Row 2:  . . X X X X X X X X . . .
+//   Row 3:  . . . . X X X X X . . . . .
+//   Row 4:  . . . . . X . . .          (Space)
+const HEART_KEYS = [
+  2, 3, 4, 7, 8, 9,                          // row 0 — two bumps
+  15, 16, 17, 18, 19, 20, 21, 22, 23, 24,    // row 1 — wide
+  30, 31, 32, 33, 34, 35, 36, 37,            // row 2
+  45, 46, 47, 48, 49,                         // row 3
+  58,                                         // row 4 — Space (bottom point)
+];
+const HEART_SET = new Set(HEART_KEYS);
+
+// Static pattern — paint heart keys with brush colour, rest black
+document.querySelectorAll('.pattern-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.pattern === 'heart') {
+      // Stop any running key animation
+      stopKeyAnim();
+
+      const on  = { ...state.brushColor };
+      const off = { r: 0, g: 0, b: 0 };
+      for (let i = 0; i < 64; i++) state.keyColors[i] = HEART_SET.has(i) ? { ...on } : { ...off };
+      paintCustomVisual();
+      scheduleCustomApply(100);
+    }
+  });
+});
+
+// ── Key animations ───────────────────────────────────────────────────────
+let _keyAnimId = null;
+
+// Grid mapping: GRID[col][row] → data-key index, or -1 if no key there.
+const GRID = [
+  [0,14,28,41,55],[1,15,29,42,56],[2,16,30,43,57],[3,17,31,44,-1],[4,18,32,45,-1],
+  [5,19,33,46,58],[6,20,34,47,-1],[7,21,35,48,-1],[8,22,36,49,59],[9,23,37,50,60],
+  [10,24,38,51,-1],[11,25,39,52,61],[12,26,-1,53,62],[13,27,40,54,63],
+];
+
+function stopKeyAnim() {
+  if (_keyAnimId) { cancelAnimationFrame(_keyAnimId); _keyAnimId = null; }
+  document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('active'));
+}
+
+// Shared: blank all keys/strips and activate custom mode, then call cb
+function _initKeyAnim(animName, cb) {
+  stopKeyAnim();
+  if (_stripAnimId) stopStripAnim();
+  if (_rippleAnimId) stopRippleAnim();
+  const off = { r: 0, g: 0, b: 0 };
+  for (let i = 0; i < 64; i++) state.keyColors[i] = { ...off };
+  for (let i = 0; i < MAIN_SIDE_COUNT; i++) state.sideColors[i] = { ...off };
+  for (let i = 0; i < NUMPAD_SIDE_COUNT; i++) state.numpadSideColors[i] = { ...off };
+  paintCustomVisual();
+  applyCustomColors().then(() => {
+    document.querySelector(`[data-anim="${animName}"]`).classList.add('active');
+    cb();
+  });
+}
+
+// ── Shapes: morphing shapes with colour transitions ──────────────────────
+// Cycles through recognisable shapes (heart, diamond, cross, star, bolt,
+// frame), each in its own colour, with smooth crossfade and gentle breathe.
+const ANIM_SHAPES = [
+  { name: 'heart', hue: 350,
+    keys: new Set([2,3,4,7,8,9, 15,16,17,18,19,20,21,22,23,24, 30,31,32,33,34,35,36,37, 45,46,47,48,49, 58]) },
+  { name: 'diamond', hue: 195,
+    keys: new Set([6,7, 19,20,21,22, 32,33,34,35,36,37, 46,47,48,49, 58,59]) },
+  { name: 'cross', hue: 120,
+    keys: new Set([5,6,7,8, 19,20,21,22, 30,31,32,33,34,35,36,37,38,39, 46,47,48,49, 58,59]) },
+  { name: 'star', hue: 50,
+    keys: new Set([6,7, 17,20,21,24, 32,33,34,35,36,37, 44,47,48,51, 58,59]) },
+  { name: 'bolt', hue: 275,
+    keys: new Set([5,6,7,8, 18,19,20, 31,32,33,34,35, 47,48,49, 59]) },
+  { name: 'frame', hue: 25,
+    keys: new Set([0,1,2,3,4,5,6,7,8,9,10,11,12,13, 14,27, 28,40, 41,54, 55,56,57,58,59,60,61,62,63]) },
+];
+
+function startShapesAnim() {
+  _initKeyAnim('shapes', () => {
+    let sending = false;
+    const displayMs = 1400;
+    const fadeMs    = 600;
+    const cycleMs   = displayMs + fadeMs;
+
+    function frame(ts) {
+      if (!_keyAnimId) return;
+
+      const total   = ts / cycleMs;
+      const curIdx  = Math.floor(total) % ANIM_SHAPES.length;
+      const nxtIdx  = (curIdx + 1) % ANIM_SHAPES.length;
+      const inCycle = (total % 1) * cycleMs;
+
+      let curB, nxtB;
+      if (inCycle < displayMs) {
+        // Gentle breathe while holding shape
+        curB = 0.75 + 0.25 * Math.sin(inCycle / displayMs * Math.PI);
+        nxtB = 0;
+      } else {
+        // Smoothstep crossfade
+        const p = (inCycle - displayMs) / fadeMs;
+        const ease = p * p * (3 - 2 * p);
+        curB = 1 - ease;
+        nxtB = ease;
+      }
+
+      const cur = ANIM_SHAPES[curIdx];
+      const nxt = ANIM_SHAPES[nxtIdx];
+      const cRgb = hslToRgb(cur.hue, 1, 0.5);
+      const nRgb = hslToRgb(nxt.hue, 1, 0.5);
+
+      const colors = [];
+      for (let i = 0; i < 64; i++) {
+        let r = 0, g = 0, b = 0;
+        if (cur.keys.has(i)) { r += cRgb.r * curB; g += cRgb.g * curB; b += cRgb.b * curB; }
+        if (nxt.keys.has(i)) { r += nRgb.r * nxtB; g += nRgb.g * nxtB; b += nRgb.b * nxtB; }
+        colors.push({ r: Math.min(255, Math.round(r)), g: Math.min(255, Math.round(g)), b: Math.min(255, Math.round(b)) });
+      }
+
+      // Strip: glow that blends both colours
+      const peak = Math.max(curB, nxtB);
+      const sB = 0.08 + peak * 0.35;
+      const mix = curB + nxtB || 1;
+      const sR = Math.round((cRgb.r * curB + nRgb.r * nxtB) / mix * sB);
+      const sG = Math.round((cRgb.g * curB + nRgb.g * nxtB) / mix * sB);
+      const sBl = Math.round((cRgb.b * curB + nRgb.b * nxtB) / mix * sB);
+      const stripC = { r: sR, g: sG, b: sBl };
+      const sideColors = Array.from({ length: MAIN_SIDE_COUNT }, () => ({ ...stripC }));
+      const npSide = state.numpadVisible
+        ? Array.from({ length: NUMPAD_SIDE_COUNT }, () => ({ ...stripC })) : null;
+
+      // Update visual
+      document.querySelectorAll('#kb-layout .key').forEach(el => {
+        if (el.classList.contains('key-empty')) return;
+        paintKeyEl(el, colors[parseInt(el.dataset.key)]);
+      });
+      document.querySelectorAll('[data-strip]').forEach(el => {
+        paintStripEl(el, stripC);
+      });
+
+      if (state.connected && !sending) {
+        sending = true;
+        window.kb.sendVizFrame({ colors, sideColors, numpadSideColors: npSide })
+          .finally(() => { sending = false; });
+      }
+
+      _keyAnimId = requestAnimationFrame(frame);
+    }
+
+    _keyAnimId = requestAnimationFrame(frame);
+  });
+}
+
+// ── Plasma: organic flowing multi-colour field ───────────────────────────
+// Overlapping sine waves create a smooth, continuously morphing colour
+// pattern across every key. Full rainbow — ignores brush colour.
+function startPlasmaAnim() {
+  _initKeyAnim('plasma', () => {
+    let sending = false;
+
+    function frame(ts) {
+      if (!_keyAnimId) return;
+      const t = ts / 1000; // seconds
+
+      const colors = [];
+      for (let i = 0; i < 64; i++) {
+        // _rkp is available here (runs after all top-level consts are init'd)
+        const pos = _rkp[i];
+        const x = pos[0] / 13;   // 0-1
+        const y = pos[1] / 4;    // 0-1
+        const v = Math.sin(x * 6 + t * 1.2)
+                + Math.sin(y * 4 + t * 1.7)
+                + Math.sin((x + y) * 5 + t * 0.9)
+                + Math.sin(Math.sqrt(x * x + y * y) * 8 - t * 1.4);
+        const hue = ((v / 4 + 1) / 2 * 360 + t * 30) % 360;
+        colors.push(hslToRgb(hue, 1, 0.5));
+      }
+
+      // Strip: rainbow flowing around perimeter
+      const sideColors = [];
+      for (let i = 0; i < MAIN_SIDE_COUNT; i++) {
+        const p = i / MAIN_SIDE_COUNT;
+        const v = Math.sin(p * 8 + t * 1.5) + Math.sin(p * 3 - t * 0.8);
+        const hue = ((v / 2 + 1) / 2 * 360 + t * 40) % 360;
+        sideColors.push(hslToRgb(hue, 1, 0.5));
+      }
+      let npSide = null;
+      if (state.numpadVisible) {
+        npSide = [];
+        for (let i = 0; i < NUMPAD_SIDE_COUNT; i++) {
+          const p = i / NUMPAD_SIDE_COUNT;
+          const v = Math.sin(p * 6 + t * 1.5) + Math.sin(p * 2 - t * 0.8);
+          const hue = ((v / 2 + 1) / 2 * 360 + t * 40) % 360;
+          npSide.push(hslToRgb(hue, 1, 0.5));
+        }
+      }
+
+      // Update visual
+      document.querySelectorAll('#kb-layout .key').forEach(el => {
+        if (el.classList.contains('key-empty')) return;
+        paintKeyEl(el, colors[parseInt(el.dataset.key)]);
+      });
+      document.querySelectorAll('[data-strip]').forEach(el => {
+        paintStripEl(el, sideColors[parseInt(el.dataset.strip)]);
+      });
+
+      if (state.connected && !sending) {
+        sending = true;
+        window.kb.sendVizFrame({ colors, sideColors, numpadSideColors: npSide })
+          .finally(() => { sending = false; });
+      }
+
+      _keyAnimId = requestAnimationFrame(frame);
+    }
+
+    _keyAnimId = requestAnimationFrame(frame);
+  });
+}
+
+// ── Animation button handlers ────────────────────────────────────────────
+document.querySelectorAll('.anim-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const anim = btn.dataset.anim;
+    // Toggle off if already running this animation
+    if (_keyAnimId && btn.classList.contains('active')) {
+      stopKeyAnim(); paintCustomVisual(); return;
+    }
+    if (anim === 'shapes') startShapesAnim();
+    else if (anim === 'plasma') startPlasmaAnim();
+  });
+});
 
 // ── Ripple animation ─────────────────────────────────────────────────────
 // Keypress-triggered: each key press spawns a single expanding ring from
@@ -1163,6 +1446,41 @@ ambHexIn.addEventListener('input', () => {
   if (rgb) { state.ambColor = rgb; ambSwatch.value = rgbToHex(rgb); }
 });
 
+function syncAmbDirVisibility() {
+  const show = state.ambStyle === 'circle';
+  document.getElementById('amb-dir-label').classList.toggle('hidden', !show);
+  document.getElementById('amb-dir-seg').classList.toggle('hidden', !show);
+}
+
+document.querySelectorAll('#amb-style-seg .seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#amb-style-seg .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.ambStyle = btn.dataset.val;
+    syncAmbDirVisibility();
+    saveLightingState();
+  });
+});
+
+document.querySelectorAll('#amb-dir-seg .seg-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#amb-dir-seg .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.ambDirection = btn.dataset.val;
+    saveLightingState();
+  });
+});
+
+document.getElementById('slider-amb-speed').addEventListener('input', e => {
+  state.ambSpeed = parseInt(e.target.value);
+  document.getElementById('lbl-amb-speed').textContent = state.ambSpeed;
+});
+
+document.getElementById('slider-amb-smoothing').addEventListener('input', e => {
+  state.ambSmoothing = parseInt(e.target.value);
+  document.getElementById('lbl-amb-smoothing').textContent = state.ambSmoothing;
+});
+
 
 document.getElementById('btn-amb-toggle').addEventListener('click', async () => {
   if (_stripAnimId) {
@@ -1261,6 +1579,7 @@ async function applyPreset(preset) {
   }
   paintCustomVisual();
   if (_stripAnimId) stopStripAnim();
+  if (_keyAnimId) stopKeyAnim();
   scheduleCustomApply(100);
   setStatus('perkey-status', `Loaded "${preset.name}"`, 'ok');
 }
